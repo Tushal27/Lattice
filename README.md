@@ -38,7 +38,7 @@ To install: open the deployed URL on your phone → browser menu → **Add to Ho
 - **Next.js 16** (App Router, React 19, TypeScript)
 - **SQLite / libSQL** via **Prisma 7** (libSQL driver adapter) — a local file in development, a hosted **Turso** database in production, with the exact same code path
 - **Tailwind CSS v4**
-- **Gemini** for the AI features, called over plain HTTP with a graceful local fallback
+- **Pluggable AI** (Groq / OpenRouter / Gemini) over plain HTTP, with a graceful local fallback
 
 The data model is deliberately simple: one `Entry` table with a `type` discriminator and a JSON `fields` column for type-specific data, plus relational `Tag`s and undirected `Connection`s. Adding a field — or a whole new area — is a config change in `src/lib/types.ts`, not a UI rewrite.
 
@@ -54,13 +54,19 @@ npm run dev            # http://localhost:3000
 
 ### Enabling AI
 
-The app is fully usable without AI. To turn on the thinking partner, reflections, and connection insight, add a free [Google AI Studio](https://aistudio.google.com/apikey) key to `.env`:
+The app is fully usable without AI. To turn on the thinking partner, reflections, quick-capture sorting, and connection insight, add **any one** provider key to `.env`. The app auto-selects in order **Groq → OpenRouter → Gemini**:
 
 ```bash
-GEMINI_API_KEY="your-key-here"
+GROQ_API_KEY="..."         # recommended: fast + generous free tier (console.groq.com/keys)
+# or
+OPENROUTER_API_KEY="..."   # many models incl. free ones (openrouter.ai/keys)
+# or
+GEMINI_API_KEY="..."       # free tier rate-limits easily / HTTP 429 (aistudio.google.com/apikey)
 ```
 
-Until then, those features fall back to local heuristics (tag/keyword-based suggestions and templated reflections).
+> Gemini's free tier 429s quickly under light use — **Groq** is the recommended free option. You can force a provider with `AI_PROVIDER=groq|openrouter|gemini`.
+
+Until a key is set, those features fall back to local heuristics (tag/keyword-based suggestions and templated reflections).
 
 ## Scripts
 
@@ -94,7 +100,7 @@ a local file. Nothing in the app code changes; it's all environment variables.
    environment variables in the project settings:
    - `TURSO_DATABASE_URL`
    - `TURSO_AUTH_TOKEN`
-   - `GEMINI_API_KEY` (optional, for AI features)
+   - one AI key (optional): `GROQ_API_KEY` *(recommended)*, `OPENROUTER_API_KEY`, or `GEMINI_API_KEY`
 
    The build runs `prisma generate` via `postinstall`; no database is touched at
    build time, and the schema is applied automatically on first run.
@@ -116,7 +122,7 @@ src/
     types.ts           config that drives every area's form & detail view
     entries.ts         data access, tags, search, connection suggestions
     companion.ts       AI orchestration (reflection, connect, ask) with fallbacks
-    ai.ts              Gemini REST client
+    ai.ts              pluggable AI client (Groq / OpenRouter / Gemini)
     db.ts              Prisma client + libSQL adapter (local file or Turso)
 prisma/                schema, migrations, seed
 scripts/               migrate-turso.mjs (apply schema to a hosted Turso db)

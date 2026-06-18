@@ -95,7 +95,7 @@ export function FloatingChat() {
                       {lastAi ? (
                         lastAi.source === "ai" ? (
                           <>
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Gemini connected
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> AI connected
                           </>
                         ) : (
                           <>

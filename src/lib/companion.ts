@@ -1,4 +1,4 @@
-import { geminiGenerate, THINKING_PARTNER_SYSTEM } from "@/lib/ai";
+import { generate, THINKING_PARTNER_SYSTEM } from "@/lib/ai";
 import { entriesInRange, getEntry, listEntries, suggestConnections } from "@/lib/entries";
 import { TYPES } from "@/lib/types";
 import { parseFields } from "@/lib/utils";
@@ -61,7 +61,7 @@ export async function reflection(period: "week" | "month"): Promise<SourcedText 
     "Keep it tight and personal. Use markdown headings.",
   ].join("\n");
 
-  const ai = await geminiGenerate(prompt, { system: THINKING_PARTNER_SYSTEM, temperature: 0.8 });
+  const ai = await generate(prompt, { system: THINKING_PARTNER_SYSTEM, temperature: 0.8 });
   if (ai) return { source: "ai", count: entries.length, text: ai };
 
   return { source: "local", count: entries.length, text: localReflection(entries, label) };
@@ -82,7 +82,7 @@ function localReflection(entries: EntryLike[], label: string): string {
     lines.push("", "### Open questions to sit with");
     for (const q of open) lines.push(`- ${q.title}`);
   }
-  lines.push("", "_Add a GEMINI_API_KEY to get a deeper, AI-written reflection._");
+  lines.push("", "_Connect an AI key (GROQ_API_KEY, OPENROUTER_API_KEY, or GEMINI_API_KEY) for a deeper, AI-written reflection._");
   return lines.join("\n");
 }
 
@@ -111,7 +111,7 @@ export async function connectionInsight(entryId: string) {
     "and what insight emerges from seeing them together. Be specific.",
   ].join("\n");
 
-  const ai = await geminiGenerate(prompt, { system: THINKING_PARTNER_SYSTEM, temperature: 0.7 });
+  const ai = await generate(prompt, { system: THINKING_PARTNER_SYSTEM, temperature: 0.7 });
   return {
     source: ai ? ("ai" as const) : ("local" as const),
     text:
@@ -145,7 +145,7 @@ export async function classifyThought(text: string): Promise<Classification> {
     `Thought: """${trimmed}"""`,
   ].join("\n");
 
-  const ai = await geminiGenerate(prompt, { temperature: 0.3 });
+  const ai = await generate(prompt, { temperature: 0.3 });
   if (ai) {
     const parsed = safeJson(ai);
     if (parsed && typeof parsed.type === "string" && parsed.type in TYPES) {
@@ -205,11 +205,11 @@ export async function askPartner(message: string): Promise<SourcedText> {
     message,
   ].join("\n");
 
-  const ai = await geminiGenerate(prompt, { system: THINKING_PARTNER_SYSTEM, temperature: 0.8 });
+  const ai = await generate(prompt, { system: THINKING_PARTNER_SYSTEM, temperature: 0.8 });
   if (ai) return { source: "ai", text: ai };
 
   return {
     source: "local",
-    text: "The AI thinking partner needs a GEMINI_API_KEY to respond. Once it's set, I'll draw on your decisions, lessons, and questions to think alongside you.",
+    text: "The AI thinking partner needs an AI key to respond — set GROQ_API_KEY (recommended), OPENROUTER_API_KEY, or GEMINI_API_KEY. Once it's set, I'll draw on your decisions, lessons, and questions to think alongside you.",
   };
 }

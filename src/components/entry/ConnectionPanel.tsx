@@ -114,7 +114,7 @@ export function ConnectionPanel({
             <div className="mb-3 rounded-xl border border-violet-500/30 bg-violet-500/5 p-4 text-sm text-zinc-200">
               <Markdown>{insight}</Markdown>
               {insightSource === "local" && (
-                <p className="mt-2 text-xs text-zinc-500">Set GEMINI_API_KEY for AI-written insight.</p>
+                <p className="mt-2 text-xs text-zinc-500">Add an AI key for AI-written insight.</p>
               )}
             </div>
           )}

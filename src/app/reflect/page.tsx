@@ -72,9 +72,9 @@ export default function ReflectPage() {
             <Markdown>{text}</Markdown>
             <div className="mt-4 flex items-center gap-2 text-xs text-zinc-500">
               {source === "ai" ? (
-                <span className="rounded-full bg-violet-500/10 px-2 py-0.5 text-violet-300">✦ written by Gemini</span>
+                <span className="rounded-full bg-violet-500/10 px-2 py-0.5 text-violet-300">✦ written by AI</span>
               ) : (
-                <span className="rounded-full bg-zinc-800 px-2 py-0.5">local summary — add GEMINI_API_KEY for more</span>
+                <span className="rounded-full bg-zinc-800 px-2 py-0.5">local summary — add an AI key for more</span>
               )}
               <button onClick={() => run(period)} className="hover:text-zinc-300">
                 ↻ regenerate
