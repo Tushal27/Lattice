@@ -8,6 +8,7 @@ interface Msg {
   role: "you" | "ai";
   text: string;
   source?: "ai" | "local";
+  provider?: string;
 }
 
 const SUGGESTIONS = [
@@ -40,7 +41,7 @@ export function FloatingChat() {
         body: JSON.stringify({ task: "ask", message }),
       });
       const data = await res.json();
-      setMessages((m) => [...m, { role: "ai", text: data.text, source: data.source }]);
+      setMessages((m) => [...m, { role: "ai", text: data.text, source: data.source, provider: data.provider }]);
     } catch {
       setMessages((m) => [...m, { role: "ai", text: "Couldn't reach the server. Try again.", source: "local" }]);
     } finally {
@@ -95,7 +96,8 @@ export function FloatingChat() {
                       {lastAi ? (
                         lastAi.source === "ai" ? (
                           <>
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> AI connected
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                            {lastAi.provider ? `connected · ${lastAi.provider}` : "AI connected"}
                           </>
                         ) : (
                           <>

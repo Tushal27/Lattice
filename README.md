@@ -52,21 +52,24 @@ npm run db:seed        # optional — load sample entries so the UI looks alive
 npm run dev            # http://localhost:3000
 ```
 
-### Enabling AI
+### Enabling AI (fallback engine)
 
-The app is fully usable without AI. To turn on the thinking partner, reflections, quick-capture sorting, and connection insight, add **any one** provider key to `.env`. The app auto-selects in order **Groq → OpenRouter → Gemini**:
+The app is fully usable without AI. To turn on the thinking partner, reflections, quick-capture sorting, and connection insight, add **one or more** provider keys to `.env`. The AI engine tries them **in order until one answers**, so a rate-limited (HTTP 429) or down provider falls through to the next automatically — your app stays up even when a provider is flaky.
 
 ```bash
-GROQ_API_KEY="..."         # recommended: fast + generous free tier (console.groq.com/keys)
-# or
-OPENROUTER_API_KEY="..."   # many models incl. free ones (openrouter.ai/keys)
-# or
-GEMINI_API_KEY="..."       # free tier rate-limits easily / HTTP 429 (aistudio.google.com/apikey)
+GROQ_API_KEY="..."        # recommended: fast + generous free tier (console.groq.com/keys)
+OPENROUTER_API_KEY="..."  # many models incl. free ones (openrouter.ai/keys)
+CEREBRAS_API_KEY="..."    # very fast free tier (cloud.cerebras.ai)
+MISTRAL_API_KEY="..."     # free tier (console.mistral.ai)
+TOGETHER_API_KEY="..."    # free + paid (api.together.ai)
+GEMINI_API_KEY="..."      # free tier 429s easily (aistudio.google.com/apikey)
 ```
 
-> Gemini's free tier 429s quickly under light use — **Groq** is the recommended free option. You can force a provider with `AI_PROVIDER=groq|openrouter|gemini`.
+Default try order is **Groq → OpenRouter → Cerebras → Mistral → Together → Gemini**. Customize with `AI_PROVIDER_ORDER="mistral,groq,gemini"`, or pin one with `AI_PROVIDER=groq`.
 
-Until a key is set, those features fall back to local heuristics (tag/keyword-based suggestions and templated reflections).
+> **Dodge rate limits:** give one provider several comma-separated keys and the engine rotates through them — `GROQ_API_KEY="key_one,key_two"`.
+
+Until at least one key is set, these features fall back to local heuristics (tag/keyword-based suggestions and templated reflections).
 
 ## Scripts
 

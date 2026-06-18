@@ -1,4 +1,4 @@
-import { generate, THINKING_PARTNER_SYSTEM } from "@/lib/ai";
+import { generate, generateDetailed, THINKING_PARTNER_SYSTEM } from "@/lib/ai";
 import { entriesInRange, getEntry, listEntries, suggestConnections } from "@/lib/entries";
 import { TYPES } from "@/lib/types";
 import { parseFields } from "@/lib/utils";
@@ -195,7 +195,7 @@ function heuristicClassify(text: string): Omit<Classification, "source"> {
   return { type, title, summary: text.length > title.length ? text.slice(0, 200) : "", tags: [] };
 }
 
-export async function askPartner(message: string): Promise<SourcedText> {
+export async function askPartner(message: string): Promise<SourcedText & { provider?: string }> {
   const recent = await listEntries({ limit: 40 });
   const prompt = [
     "Here is recent context from my personal operating system:",
@@ -205,8 +205,8 @@ export async function askPartner(message: string): Promise<SourcedText> {
     message,
   ].join("\n");
 
-  const ai = await generate(prompt, { system: THINKING_PARTNER_SYSTEM, temperature: 0.8 });
-  if (ai) return { source: "ai", text: ai };
+  const ai = await generateDetailed(prompt, { system: THINKING_PARTNER_SYSTEM, temperature: 0.8 });
+  if (ai) return { source: "ai", text: ai.text, provider: ai.provider };
 
   return {
     source: "local",

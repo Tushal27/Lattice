@@ -1,114 +1,204 @@
-// Provider-agnostic AI layer for Lattice's thinking-partner features.
+// Provider-agnostic AI engine with an automatic fallback chain.
 //
-// Set ANY one of these keys and it just works (auto-selected in this order):
-//   GROQ_API_KEY        — Groq (recommended: fast, generous free tier)
-//   OPENROUTER_API_KEY  — OpenRouter (many free model variants)
-//   GEMINI_API_KEY      — Google Gemini (free tier, but rate-limits easily)
+// Configure ANY number of providers/keys via env. The engine builds an ordered
+// list of candidates and tries each until one answers — so a rate-limited (429)
+// or down provider transparently falls through to the next. You can also supply
+// MULTIPLE comma-separated keys for one provider to rotate around per-key limits:
 //
-// Optionally force one with AI_PROVIDER=groq|openrouter|gemini.
-// Every caller degrades gracefully to a local heuristic when no provider is
-// configured or a call fails, so the app stays fully usable without AI.
+//   GROQ_API_KEY="key_a,key_b"
+//   OPENROUTER_API_KEY="..."
+//   GEMINI_API_KEY="..."
+//
+// Order is Groq → OpenRouter → Cerebras → Mistral → Together → Gemini by default.
+// Override with AI_PROVIDER_ORDER="mistral,groq,gemini" or pin one with
+// AI_PROVIDER="groq". No keys → callers fall back to local heuristics.
 
-type Provider = "groq" | "openrouter" | "gemini";
+type Kind = "openai" | "gemini";
+
+interface ProviderSpec {
+  name: string;
+  kind: Kind;
+  keyEnv: string;
+  modelEnv: string;
+  defaultModel: string;
+  url: string; // chat-completions endpoint (openai kind)
+  headers?: () => Record<string, string>;
+}
+
+// Most providers speak the OpenAI chat-completions format, so they share a path.
+const REGISTRY: ProviderSpec[] = [
+  {
+    name: "groq",
+    kind: "openai",
+    keyEnv: "GROQ_API_KEY",
+    modelEnv: "GROQ_MODEL",
+    defaultModel: "llama-3.3-70b-versatile",
+    url: "https://api.groq.com/openai/v1/chat/completions",
+  },
+  {
+    name: "openrouter",
+    kind: "openai",
+    keyEnv: "OPENROUTER_API_KEY",
+    modelEnv: "OPENROUTER_MODEL",
+    defaultModel: "meta-llama/llama-3.3-70b-instruct:free",
+    url: "https://openrouter.ai/api/v1/chat/completions",
+    headers: () => ({ "HTTP-Referer": "https://lattice.app", "X-Title": "Lattice" }),
+  },
+  {
+    name: "cerebras",
+    kind: "openai",
+    keyEnv: "CEREBRAS_API_KEY",
+    modelEnv: "CEREBRAS_MODEL",
+    defaultModel: "llama-3.3-70b",
+    url: "https://api.cerebras.ai/v1/chat/completions",
+  },
+  {
+    name: "mistral",
+    kind: "openai",
+    keyEnv: "MISTRAL_API_KEY",
+    modelEnv: "MISTRAL_MODEL",
+    defaultModel: "mistral-small-latest",
+    url: "https://api.mistral.ai/v1/chat/completions",
+  },
+  {
+    name: "together",
+    kind: "openai",
+    keyEnv: "TOGETHER_API_KEY",
+    modelEnv: "TOGETHER_MODEL",
+    defaultModel: "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free",
+    url: "https://api.together.xyz/v1/chat/completions",
+  },
+  {
+    name: "gemini",
+    kind: "gemini",
+    keyEnv: "GEMINI_API_KEY",
+    modelEnv: "GEMINI_MODEL",
+    defaultModel: "gemini-2.0-flash",
+    url: "",
+  },
+];
+
+interface Candidate {
+  spec: ProviderSpec;
+  key: string;
+  model: string;
+}
+
+function resolveOrder(): string[] {
+  const forced = process.env.AI_PROVIDER?.toLowerCase().trim();
+  if (forced) return [forced];
+  const custom = process.env.AI_PROVIDER_ORDER?.toLowerCase()
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (custom && custom.length) return custom;
+  return REGISTRY.map((s) => s.name);
+}
+
+function candidates(): Candidate[] {
+  const out: Candidate[] = [];
+  for (const name of resolveOrder()) {
+    const spec = REGISTRY.find((s) => s.name === name);
+    if (!spec) continue;
+    const raw = process.env[spec.keyEnv];
+    if (!raw) continue;
+    const model = process.env[spec.modelEnv]?.trim() || spec.defaultModel;
+    for (const key of raw.split(",").map((k) => k.trim()).filter(Boolean)) {
+      out.push({ spec, key, model });
+    }
+  }
+  return out;
+}
+
+export function aiEnabled(): boolean {
+  return candidates().length > 0;
+}
+
+/** Names of the providers that have at least one key configured, in try order. */
+export function configuredProviders(): string[] {
+  return [...new Set(candidates().map((c) => c.spec.name))];
+}
 
 interface GenerateOptions {
   system?: string;
   temperature?: number;
 }
 
-const MODELS = {
-  groq: process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile",
-  openrouter: process.env.OPENROUTER_MODEL ?? "meta-llama/llama-3.3-70b-instruct:free",
-  gemini: process.env.GEMINI_MODEL ?? "gemini-2.0-flash",
-};
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-function activeProvider(): Provider | null {
-  const forced = process.env.AI_PROVIDER?.toLowerCase();
-  if (forced === "groq" && process.env.GROQ_API_KEY) return "groq";
-  if (forced === "openrouter" && process.env.OPENROUTER_API_KEY) return "openrouter";
-  if (forced === "gemini" && process.env.GEMINI_API_KEY) return "gemini";
-  if (process.env.GROQ_API_KEY) return "groq";
-  if (process.env.OPENROUTER_API_KEY) return "openrouter";
-  if (process.env.GEMINI_API_KEY) return "gemini";
+/**
+ * Runs the fallback chain and returns the first successful result together with
+ * the provider that produced it (handy for showing which key is live). Returns
+ * null only when every configured candidate fails.
+ */
+export async function generateDetailed(
+  prompt: string,
+  opts: GenerateOptions = {},
+): Promise<{ text: string; provider: string } | null> {
+  const cands = candidates();
+  if (cands.length === 0) return null;
+
+  // Two passes: the first walks every provider/key; the second gives transient
+  // failures (e.g. a lone rate-limited key) one more chance after a short pause.
+  for (let pass = 0; pass < 2; pass++) {
+    for (const c of cands) {
+      try {
+        const text =
+          c.spec.kind === "gemini"
+            ? await callGemini(c.key, c.model, prompt, opts)
+            : await callOpenAI(c.spec, c.key, c.model, prompt, opts);
+        if (text) return { text, provider: c.spec.name };
+      } catch (err) {
+        console.error(`AI candidate failed (${c.spec.name})`, err);
+      }
+    }
+    if (pass === 0) await sleep(900);
+  }
   return null;
 }
 
-export function aiEnabled(): boolean {
-  return activeProvider() !== null;
-}
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-/** POST with a single automatic retry on 429 (rate limit) / 503. */
-async function postWithRetry(url: string, init: RequestInit): Promise<Response> {
-  let res = await fetch(url, init);
-  if (res.status === 429 || res.status === 503) {
-    await sleep(1400);
-    res = await fetch(url, init);
-  }
-  return res;
-}
-
-/**
- * Returns generated text, or null if AI is unavailable / errored.
- * Callers should always provide their own fallback for the null case.
- */
+/** Convenience wrapper that returns just the text. */
 export async function generate(prompt: string, opts: GenerateOptions = {}): Promise<string | null> {
-  const provider = activeProvider();
-  if (!provider) return null;
-  try {
-    return provider === "gemini" ? await callGemini(prompt, opts) : await callOpenAICompatible(provider, prompt, opts);
-  } catch (err) {
-    console.error(`AI request errored (${provider})`, err);
-    return null;
-  }
+  return (await generateDetailed(prompt, opts))?.text ?? null;
 }
 
-// Groq and OpenRouter both speak the OpenAI chat-completions format.
-async function callOpenAICompatible(
-  provider: "groq" | "openrouter",
+async function callOpenAI(
+  spec: ProviderSpec,
+  key: string,
+  model: string,
   prompt: string,
   opts: GenerateOptions,
 ): Promise<string | null> {
-  const url =
-    provider === "groq"
-      ? "https://api.groq.com/openai/v1/chat/completions"
-      : "https://openrouter.ai/api/v1/chat/completions";
-  const key = provider === "groq" ? process.env.GROQ_API_KEY : process.env.OPENROUTER_API_KEY;
-
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${key}`,
-  };
-  if (provider === "openrouter") {
-    headers["HTTP-Referer"] = "https://lattice.app";
-    headers["X-Title"] = "Lattice";
-  }
-
   const messages = [
     ...(opts.system ? [{ role: "system", content: opts.system }] : []),
     { role: "user", content: prompt },
   ];
-
-  const res = await postWithRetry(url, {
+  const res = await fetch(spec.url, {
     method: "POST",
-    headers,
-    body: JSON.stringify({ model: MODELS[provider], messages, temperature: opts.temperature ?? 0.7 }),
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${key}`,
+      ...(spec.headers?.() ?? {}),
+    },
+    body: JSON.stringify({ model, messages, temperature: opts.temperature ?? 0.7 }),
     signal: AbortSignal.timeout(30_000),
   });
-
   if (!res.ok) {
-    console.error(`${provider} request failed`, res.status, await res.text().catch(() => ""));
+    console.warn(`${spec.name} ${res.status}`, await res.text().catch(() => ""));
     return null;
   }
   const data = await res.json();
   return data?.choices?.[0]?.message?.content?.trim() || null;
 }
 
-async function callGemini(prompt: string, opts: GenerateOptions): Promise<string | null> {
-  const key = process.env.GEMINI_API_KEY;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.gemini}:generateContent?key=${key}`;
-  const res = await postWithRetry(url, {
+async function callGemini(
+  key: string,
+  model: string,
+  prompt: string,
+  opts: GenerateOptions,
+): Promise<string | null> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+  const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -118,9 +208,8 @@ async function callGemini(prompt: string, opts: GenerateOptions): Promise<string
     }),
     signal: AbortSignal.timeout(30_000),
   });
-
   if (!res.ok) {
-    console.error("Gemini request failed", res.status, await res.text().catch(() => ""));
+    console.warn(`gemini ${res.status}`, await res.text().catch(() => ""));
     return null;
   }
   const data = await res.json();
