@@ -1,0 +1,71 @@
+// Lattice — a personal operating system.
+// Everything the user captures is an `Entry`. The `type` field discriminates
+// between decisions, lessons, aha moments, questions, and projects. Structured,
+// type-specific data lives in the JSON `fields` column so each area can evolve
+// its own shape without schema churn. Cross-area `Connection`s and shared `Tag`s
+// turn isolated notes into a network of understanding.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Entry {
+  id         String    @id @default(cuid())
+  type       String // decision | lesson | aha | question | project
+  title      String
+  summary    String? // short human-readable body / context line
+  status     String? // question: open|exploring|answered — project: active|paused|done
+  confidence Int? // 0-100, primarily for decisions
+  fields     String? // JSON blob of type-specific structured fields
+  occurredAt DateTime? // when it actually happened (drives the life timeline)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  // A project is itself an Entry; other entries can belong to it.
+  projectId String?
+  project   Entry?  @relation("ProjectEntries", fields: [projectId], references: [id], onDelete: SetNull)
+  children  Entry[] @relation("ProjectEntries")
+
+  tags EntryTag[]
+
+  connectionsFrom Connection[] @relation("FromEntry")
+  connectionsTo   Connection[] @relation("ToEntry")
+
+  @@index([type])
+  @@index([occurredAt])
+}
+
+model Tag {
+  id      String     @id @default(cuid())
+  name    String     @unique
+  entries EntryTag[]
+}
+
+model EntryTag {
+  entryId String
+  tagId   String
+  entry   Entry  @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  tag     Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([entryId, tagId])
+  @@index([tagId])
+}
+
+model Connection {
+  id        String   @id @default(cuid())
+  fromId    String
+  toId      String
+  note      String? // why these two relate
+  createdAt DateTime @default(now())
+
+  from Entry @relation("FromEntry", fields: [fromId], references: [id], onDelete: Cascade)
+  to   Entry @relation("ToEntry", fields: [toId], references: [id], onDelete: Cascade)
+
+  @@unique([fromId, toId])
+  @@index([toId])
+}

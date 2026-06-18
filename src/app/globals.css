@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html,
+body {
+  background-color: #09090b;
+  color: #e4e4e7;
+}
+
+body {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background-image:
+    radial-gradient(60rem 60rem at 110% -10%, rgba(139, 92, 246, 0.08), transparent),
+    radial-gradient(50rem 50rem at -10% 10%, rgba(56, 189, 248, 0.06), transparent);
+  background-attachment: fixed;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Thin, unobtrusive scrollbars that match the dark canvas. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #3f3f46 transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 9999px;
+}
+
+/* Render markdown-ish content (reflections, AI replies) with breathing room. */
+.prose-lattice h1,
+.prose-lattice h2,
+.prose-lattice h3 {
+  font-weight: 600;
+  color: #f4f4f5;
+  margin: 1rem 0 0.4rem;
+}
+.prose-lattice h3 {
+  font-size: 1rem;
+}
+.prose-lattice p {
+  margin: 0.5rem 0;
+  line-height: 1.6;
+}
+.prose-lattice ul {
+  margin: 0.5rem 0;
+  padding-left: 1.2rem;
+  list-style: disc;
+}
+.prose-lattice li {
+  margin: 0.2rem 0;
+}
+.prose-lattice strong {
+  color: #f4f4f5;
+}
+.prose-lattice em {
+  color: #a1a1aa;
+}
