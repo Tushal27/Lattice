@@ -27,6 +27,16 @@ interface ProviderSpec {
 
 // Most providers speak the OpenAI chat-completions format, so they share a path.
 const REGISTRY: ProviderSpec[] = [
+  // Your own / self-hosted OpenAI-compatible endpoint. Set AI_BASE_URL +
+  // AI_API_KEY (+ AI_MODEL) and it becomes the primary engine.
+  {
+    name: "custom",
+    kind: "openai",
+    keyEnv: "AI_API_KEY",
+    modelEnv: "AI_MODEL",
+    defaultModel: "default",
+    url: "", // resolved at runtime from AI_BASE_URL
+  },
   {
     name: "groq",
     kind: "openai",
@@ -82,6 +92,7 @@ interface Candidate {
   spec: ProviderSpec;
   key: string;
   model: string;
+  url: string;
 }
 
 function resolveOrder(): string[] {
@@ -95,6 +106,14 @@ function resolveOrder(): string[] {
   return REGISTRY.map((s) => s.name);
 }
 
+function resolveUrl(spec: ProviderSpec): string {
+  if (spec.name === "custom") {
+    const base = process.env.AI_BASE_URL?.trim().replace(/\/+$/, "");
+    return base ? `${base}/chat/completions` : "";
+  }
+  return spec.url;
+}
+
 function candidates(): Candidate[] {
   const out: Candidate[] = [];
   for (const name of resolveOrder()) {
@@ -102,9 +121,11 @@ function candidates(): Candidate[] {
     if (!spec) continue;
     const raw = process.env[spec.keyEnv];
     if (!raw) continue;
+    const url = resolveUrl(spec);
+    if (spec.kind === "openai" && !url) continue; // e.g. custom without AI_BASE_URL
     const model = process.env[spec.modelEnv]?.trim() || spec.defaultModel;
     for (const key of raw.split(",").map((k) => k.trim()).filter(Boolean)) {
-      out.push({ spec, key, model });
+      out.push({ spec, key, model, url });
     }
   }
   return out;
@@ -146,7 +167,7 @@ export async function generateDetailed(
         const text =
           c.spec.kind === "gemini"
             ? await callGemini(c.key, c.model, prompt, opts)
-            : await callOpenAI(c.spec, c.key, c.model, prompt, opts);
+            : await callOpenAI(c.spec, c.url, c.key, c.model, prompt, opts);
         if (text) return { text, provider: c.spec.name };
       } catch (err) {
         console.error(`AI candidate failed (${c.spec.name})`, err);
@@ -164,6 +185,7 @@ export async function generate(prompt: string, opts: GenerateOptions = {}): Prom
 
 async function callOpenAI(
   spec: ProviderSpec,
+  url: string,
   key: string,
   model: string,
   prompt: string,
@@ -173,7 +195,7 @@ async function callOpenAI(
     ...(opts.system ? [{ role: "system", content: opts.system }] : []),
     { role: "user", content: prompt },
   ];
-  const res = await fetch(spec.url, {
+  const res = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

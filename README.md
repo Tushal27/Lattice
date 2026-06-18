@@ -28,6 +28,7 @@ On top of the areas:
 - **Life Timeline** — a chronological view of your evolution.
 - **Reflections** — weekly and monthly reviews that turn recent activity into self-awareness.
 - **Thinking Partner** — an AI that helps you *think better*: find patterns, connect ideas, and challenge assumptions, drawing on your own entries.
+- **Agent** — the floating ✦ assistant doesn't just talk, it *acts*. Say "I decided to drop the side project, fairly sure, tag career" and it creates a fully-filled Decision; ask it to connect, update, or mark a question answered and it does, showing each action as a card you can open or undo. Uses a provider-agnostic JSON tool protocol over a bounded, delete-free loop.
 
 **Mobile-first & installable (PWA).** Lattice is built to live on your phone: a thumb-reachable bottom tab bar, a central capture button, touch-friendly graph gestures, and responsive layouts throughout. It's an installable Progressive Web App with a home-screen icon, standalone (no browser chrome) display, app shortcuts, and a service worker that keeps pages you've already opened available offline.
 
@@ -65,7 +66,9 @@ TOGETHER_API_KEY="..."    # free + paid (api.together.ai)
 GEMINI_API_KEY="..."      # free tier 429s easily (aistudio.google.com/apikey)
 ```
 
-Default try order is **Groq → OpenRouter → Cerebras → Mistral → Together → Gemini**. Customize with `AI_PROVIDER_ORDER="mistral,groq,gemini"`, or pin one with `AI_PROVIDER=groq`.
+Default try order is **custom → Groq → OpenRouter → Cerebras → Mistral → Together → Gemini**. Customize with `AI_PROVIDER_ORDER="mistral,groq,gemini"`, or pin one with `AI_PROVIDER=groq`.
+
+**Bring your own model:** point Lattice at any OpenAI-compatible endpoint (e.g. a self-hosted roster) by setting `AI_BASE_URL`, `AI_API_KEY`, and `AI_MODEL` — it then becomes the primary engine, with the public providers as automatic fallback.
 
 > **Dodge rate limits:** give one provider several comma-separated keys and the engine rotates through them — `GROQ_API_KEY="key_one,key_two"`.
 
