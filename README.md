@@ -74,38 +74,36 @@ Until then, those features fall back to local heuristics (tag/keyword-based sugg
 | `npm run db:turso` | Apply the schema to a hosted Turso database |
 | `npm run lint` | Lint |
 
-## Deploy (so you can install it on your phone)
+## Deploy (doable entirely from a phone browser)
 
 A PWA installs from a hosted URL, and serverless hosts have an ephemeral
 filesystem — so production uses a hosted **Turso** (libSQL) database instead of
 a local file. Nothing in the app code changes; it's all environment variables.
+**The app creates its own tables on first boot, so there is no migration step.**
 
-1. **Create a Turso database** (free tier):
+1. **Create a Turso database** at [turso.tech](https://turso.tech) (free). From
+   the web dashboard (works on mobile), copy the database **URL**
+   (`libsql://…`) and create an **auth token**. With the CLI it's instead:
    ```bash
-   # https://docs.turso.tech/quickstart
    turso db create lattice
-   turso db show lattice --url          # -> TURSO_DATABASE_URL (libsql://…)
-   turso db tokens create lattice       # -> TURSO_AUTH_TOKEN
+   turso db show lattice --url       # -> TURSO_DATABASE_URL
+   turso db tokens create lattice    # -> TURSO_AUTH_TOKEN
    ```
 
-2. **Apply the schema** to it (one time):
-   ```bash
-   TURSO_DATABASE_URL="libsql://…" TURSO_AUTH_TOKEN="…" npm run db:turso
-   ```
-
-3. **Deploy to Vercel** (or any Next.js host): import the repo, and set these
+2. **Deploy to Vercel** (or any Next.js host): import the repo and set these
    environment variables in the project settings:
    - `TURSO_DATABASE_URL`
    - `TURSO_AUTH_TOKEN`
    - `GEMINI_API_KEY` (optional, for AI features)
 
-   The build runs `prisma generate` automatically via `postinstall`; no database
-   is touched at build time.
+   The build runs `prisma generate` via `postinstall`; no database is touched at
+   build time, and the schema is applied automatically on first run.
 
-4. **Install on your phone**: open the deployed URL → **Add to Home Screen**.
+3. **Install on your phone**: open the deployed URL → **Add to Home Screen**.
 
 > When `TURSO_DATABASE_URL` is set, the app uses it; otherwise it falls back to
-> the local `DATABASE_URL` file. The same libSQL adapter handles both.
+> the local `DATABASE_URL` file. The same libSQL adapter handles both. If you'd
+> rather apply the schema manually, `npm run db:turso` still works.
 
 ## Project structure
 
