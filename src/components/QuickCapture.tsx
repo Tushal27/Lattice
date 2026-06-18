@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { EntryForm } from "@/components/EntryForm";
+import { MicButton } from "@/components/MicButton";
 import { TYPE_LIST, TYPES, isEntryType, type EntryType } from "@/lib/types";
 import { accent, cn } from "@/lib/utils";
 
@@ -94,8 +95,9 @@ export function QuickCapture({ projects }: { projects: { id: string; title: stri
           rows={4}
           autoFocus
           placeholder="Dump a raw thought — a decision you made, something you learned, a question, an idea… I'll sort it into the right place."
-          className="w-full rounded-xl border border-zinc-700 bg-zinc-900/60 p-4 text-zinc-100 placeholder:text-zinc-600 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-violet-500/40"
+          className="w-full rounded-xl border border-zinc-700 bg-zinc-900/60 p-4 pr-14 text-zinc-100 placeholder:text-zinc-600 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-violet-500/40"
         />
+        <MicButton value={text} onChange={setText} className="absolute right-3 top-3 h-9 w-9" />
       </div>
       <div className="mt-3 flex items-center justify-between">
         <span className="text-xs text-zinc-600">⌘/Ctrl + Enter</span>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { Markdown } from "@/components/Markdown";
+import { MicButton } from "@/components/MicButton";
 import { TYPES, type EntryType } from "@/lib/types";
 
 interface Step {
@@ -48,6 +49,7 @@ export function FloatingChat() {
   async function send(text: string) {
     const message = text.trim();
     if (!message || loading) return;
+    window.dispatchEvent(new CustomEvent("lattice:stt-stop")); // stop any dictation
     const history = messages.map((m) => ({ role: m.role, text: m.text }));
     setMessages((m) => [...m, { role: "you", text: message }]);
     setInput("");
@@ -219,6 +221,7 @@ export function FloatingChat() {
                   placeholder="Tell me what to capture, or ask…"
                   className="flex-1 rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-violet-400/50 focus:outline-none"
                 />
+                <MicButton value={input} onChange={setInput} className="h-10 w-10 shrink-0" />
                 <button
                   type="submit"
                   disabled={loading || !input.trim()}
