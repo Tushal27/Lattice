@@ -121,6 +121,80 @@ export async function connectionInsight(entryId: string) {
   };
 }
 
+export interface Classification {
+  source: "ai" | "local";
+  type: string;
+  title: string;
+  summary: string;
+  tags: string[];
+}
+
+/**
+ * Turns a raw, unstructured thought into a suggested entry — which area it
+ * belongs to, a clean title, a one-line summary, and tags. Falls back to a
+ * keyword heuristic when AI is unavailable so quick-capture always works.
+ */
+export async function classifyThought(text: string): Promise<Classification> {
+  const trimmed = text.trim();
+  const prompt = [
+    "Classify this raw thought into one Lattice area and structure it.",
+    'Respond with ONLY a JSON object, no markdown, of the form:',
+    '{"type":"decision|lesson|aha|question|project","title":"short clear title","summary":"one sentence","tags":["lowercase","tags"]}',
+    "Pick the single best type. Keep the title under 12 words. 2-4 tags.",
+    "",
+    `Thought: """${trimmed}"""`,
+  ].join("\n");
+
+  const ai = await geminiGenerate(prompt, { temperature: 0.3 });
+  if (ai) {
+    const parsed = safeJson(ai);
+    if (parsed && typeof parsed.type === "string" && parsed.type in TYPES) {
+      return {
+        source: "ai",
+        type: parsed.type,
+        title: String(parsed.title ?? "").slice(0, 140) || trimmed.slice(0, 80),
+        summary: String(parsed.summary ?? ""),
+        tags: Array.isArray(parsed.tags) ? parsed.tags.map(String).slice(0, 5) : [],
+      };
+    }
+  }
+
+  return { source: "local", ...heuristicClassify(trimmed) };
+}
+
+function safeJson(raw: string): Record<string, unknown> | null {
+  const cleaned = raw.replace(/```json/gi, "").replace(/```/g, "").trim();
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
+  if (start === -1 || end === -1) return null;
+  try {
+    return JSON.parse(cleaned.slice(start, end + 1));
+  } catch {
+    return null;
+  }
+}
+
+function heuristicClassify(text: string): Omit<Classification, "source"> {
+  const lower = text.toLowerCase();
+  // Stems are matched at a word boundary but without a trailing one, so they
+  // also catch inflected forms ("decid" → decided/deciding).
+  let type = "lesson";
+  if (text.includes("?") || /^(how|why|what|when|where|who|which|is|are|do|does|can)\b/.test(lower)) {
+    type = "question";
+  } else if (/\b(decid|chose|choos|opting|going with|will (use|go|take))/.test(lower)) {
+    type = "decision";
+  } else if (/\b(realiz|aha|clicked|it dawned|understood that|insight)/.test(lower)) {
+    type = "aha";
+  } else if (/\b(project|building|launch|shipping|working on)/.test(lower)) {
+    type = "project";
+  } else if (/\b(learn|lesson|mistake|should have|next time|note to self)/.test(lower)) {
+    type = "lesson";
+  }
+  const firstSentence = text.split(/[.!?\n]/)[0].trim();
+  const title = (firstSentence || text).slice(0, 80);
+  return { type, title, summary: text.length > title.length ? text.slice(0, 200) : "", tags: [] };
+}
+
 export async function askPartner(message: string): Promise<SourcedText> {
   const recent = await listEntries({ limit: 40 });
   const prompt = [

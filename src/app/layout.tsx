@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/Sidebar";
 import { MobileNav } from "@/components/MobileNav";
+import { CommandPalette } from "@/components/CommandPalette";
+import { Toaster } from "@/components/Toast";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -21,9 +23,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <Sidebar />
           <div className="flex min-w-0 flex-1 flex-col">
             <MobileNav />
-            <main className="mx-auto w-full max-w-5xl flex-1 px-5 py-8 md:px-10">{children}</main>
+            <main className="mx-auto w-full max-w-5xl flex-1 px-5 pb-28 pt-6 md:px-10 md:py-8">{children}</main>
           </div>
         </div>
+        <CommandPalette />
+        <Toaster />
       </body>
     </html>
   );

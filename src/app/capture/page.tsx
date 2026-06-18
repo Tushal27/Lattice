@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { EntryForm } from "@/components/EntryForm";
+import { QuickCapture } from "@/components/QuickCapture";
 import { PageHeader } from "@/components/ui";
 import { listProjects } from "@/lib/entries";
 import { TYPE_LIST, TYPES, isEntryType } from "@/lib/types";
@@ -15,7 +16,16 @@ export default async function CapturePage(props: PageProps<"/capture">) {
   if (!selected) {
     return (
       <div className="animate-[fadeUp_0.4s_ease-out]">
-        <PageHeader title="Capture something" subtitle="What kind of moment do you want to preserve?" />
+        <PageHeader title="Capture something" subtitle="Dump a thought and let AI sort it — or pick an area yourself." />
+
+        <div className="mb-10">
+          <QuickCapture projects={projects.map((p) => ({ id: p.id, title: p.title }))} />
+        </div>
+
+        <div className="mb-4 flex items-center gap-3 text-xs uppercase tracking-wider text-zinc-600">
+          <span className="h-px flex-1 bg-zinc-800" /> or pick an area <span className="h-px flex-1 bg-zinc-800" />
+        </div>
+
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {TYPE_LIST.map((t) => {
             const a = accent(t.accent);

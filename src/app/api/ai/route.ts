@@ -1,4 +1,4 @@
-import { askPartner, connectionInsight, reflection } from "@/lib/companion";
+import { askPartner, classifyThought, connectionInsight, reflection } from "@/lib/companion";
 
 export async function POST(request: Request) {
   let body: Record<string, unknown>;
@@ -23,6 +23,11 @@ export async function POST(request: Request) {
       const message = String(body.message ?? "").trim();
       if (!message) return Response.json({ error: "message required" }, { status: 400 });
       return Response.json(await askPartner(message));
+    }
+    case "classify": {
+      const text = String(body.text ?? "").trim();
+      if (!text) return Response.json({ error: "text required" }, { status: 400 });
+      return Response.json(await classifyThought(text));
     }
     default:
       return Response.json({ error: "Unknown task" }, { status: 400 });

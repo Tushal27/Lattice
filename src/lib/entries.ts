@@ -335,3 +335,41 @@ export async function entriesInRange(start: Date, end: Date) {
     orderBy: { createdAt: "asc" },
   });
 }
+
+/** Entries that happened on this calendar day in a previous year/period. */
+export async function onThisDay() {
+  const all = await prisma.entry.findMany({
+    select: { id: true, type: true, title: true, summary: true, occurredAt: true, createdAt: true },
+  });
+  const now = new Date();
+  return all
+    .map((e) => ({ ...e, when: e.occurredAt ?? e.createdAt }))
+    .filter(
+      (e) =>
+        e.when.getMonth() === now.getMonth() &&
+        e.when.getDate() === now.getDate() &&
+        e.when.getFullYear() !== now.getFullYear(),
+    )
+    .sort((a, b) => b.when.getTime() - a.when.getTime());
+}
+
+/**
+ * Deterministically resurfaces a few older lessons/insights each day so wisdom
+ * doesn't get buried. The selection rotates by day but is stable within a day.
+ */
+export async function resurface(limit = 3) {
+  const cutoff = new Date(Date.now() - 14 * 86_400_000);
+  const pool = await prisma.entry.findMany({
+    where: { type: { in: ["lesson", "aha", "decision"] }, createdAt: { lt: cutoff } },
+    orderBy: { createdAt: "asc" },
+    include: { tags: { include: { tag: true } } },
+  });
+  if (pool.length === 0) return [];
+  const dayIndex = Math.floor(Date.now() / 86_400_000);
+  const picked = new Map<string, (typeof pool)[number]>();
+  for (let i = 0; i < Math.min(limit, pool.length); i++) {
+    const e = pool[(dayIndex + i) % pool.length];
+    picked.set(e.id, e);
+  }
+  return [...picked.values()];
+}

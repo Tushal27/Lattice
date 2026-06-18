@@ -18,11 +18,18 @@ Every captured moment is an **Entry**. There are five kinds:
 
 On top of the areas:
 
-- **Knowledge connections** — link any two entries; Lattice also *suggests* links from shared tags and themes, so isolated notes become a network of understanding.
+- **Quick Capture** — dump a raw thought and AI sorts it into the right area with a title and tags. Friction is the #1 reason second brains get abandoned.
+- **⌘K Command Palette** — capture, search, and jump anywhere from one keystroke (or the "Find" button on mobile).
+- **Knowledge Graph** — an interactive, force-directed visualization of your lattice: nodes are entries, edges are connections and project membership. Drag, zoom, and click through.
+- **Daily Review** — decisions old enough to judge, spaced resurfacing of past lessons, and "on this day" — so nothing valuable stays buried.
+- **Patterns** — where your attention goes, recurring themes, emerging interests, decision calibration (confidence vs outcome), and your most-connected ideas.
+- **Knowledge connections** — link any two entries; Lattice also *suggests* links from shared tags and themes.
 - **Global search** — recall anything across every area at once.
 - **Life Timeline** — a chronological view of your evolution.
 - **Reflections** — weekly and monthly reviews that turn recent activity into self-awareness.
 - **Thinking Partner** — an AI that helps you *think better*: find patterns, connect ideas, and challenge assumptions, drawing on your own entries.
+
+**Mobile-first.** Lattice is built to live on your phone: a thumb-reachable bottom tab bar, a central capture button, touch-friendly graph gestures, and responsive layouts throughout.
 
 ## Tech
 

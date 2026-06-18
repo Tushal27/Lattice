@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "@/components/Toast";
 import { TYPES, type EntryType, type FieldDef } from "@/lib/types";
 import { accent, cn } from "@/lib/utils";
 
@@ -15,19 +16,22 @@ export interface EntryFormProps {
     tags: string[];
     projectId: string | null;
   };
+  /** Prefill values for a brand-new entry (e.g. from AI quick-capture). */
+  defaultValues?: Record<string, string>;
+  defaultTags?: string[];
   showReview?: boolean;
 }
 
 const inputBase =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900/70 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-transparent focus:outline-none focus:ring-2";
 
-export function EntryForm({ type, projects, initial, showReview }: EntryFormProps) {
+export function EntryForm({ type, projects, initial, defaultValues, defaultTags, showReview }: EntryFormProps) {
   const router = useRouter();
   const cfg = TYPES[type];
   const a = accent(cfg.accent);
 
-  const [values, setValues] = useState<Record<string, string>>(initial?.values ?? {});
-  const [tags, setTags] = useState(initial?.tags.join(", ") ?? "");
+  const [values, setValues] = useState<Record<string, string>>(initial?.values ?? defaultValues ?? {});
+  const [tags, setTags] = useState(initial?.tags.join(", ") ?? defaultTags?.join(", ") ?? "");
   const [projectId, setProjectId] = useState(initial?.projectId ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,6 +63,7 @@ export function EntryForm({ type, projects, initial, showReview }: EntryFormProp
       return;
     }
     const entry = await res.json();
+    toast(editing ? "Changes saved" : `${cfg.label} captured`);
     router.push(`/entry/${editing ? initial!.id : entry.id}`);
     router.refresh();
   }
