@@ -23,7 +23,7 @@ export interface EntryFormProps {
 }
 
 const inputBase =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900/70 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-transparent focus:outline-none focus:ring-2";
+  "w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 backdrop-blur-sm transition-colors focus:border-violet-400/40 focus:bg-white/[0.07] focus:outline-none focus:ring-2";
 
 export function EntryForm({ type, projects, initial, defaultValues, defaultTags, showReview }: EntryFormProps) {
   const router = useRouter();
@@ -106,14 +106,14 @@ export function EntryForm({ type, projects, initial, defaultValues, defaultTags,
         <button
           type="submit"
           disabled={saving}
-          className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-violet-500 disabled:opacity-50"
+          className="press glow-violet rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50"
         >
           {saving ? "Saving…" : initial ? "Save changes" : `Save ${cfg.label}`}
         </button>
         <button
           type="button"
           onClick={() => router.back()}
-          className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 transition-colors hover:bg-zinc-800"
+          className="press rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm text-zinc-300 hover:bg-white/10"
         >
           Cancel
         </button>

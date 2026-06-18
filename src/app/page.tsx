@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { EntryCard } from "@/components/EntryCard";
+import { StatGrid } from "@/components/StatGrid";
 import { decisionsAwaitingReview, getStats, listEntries } from "@/lib/entries";
 import { prisma } from "@/lib/db";
-import { TYPE_LIST } from "@/lib/types";
-import { accent, cn, relativeTime } from "@/lib/utils";
+import { relativeTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -37,13 +37,15 @@ export default async function Home() {
   return (
     <div className="animate-[fadeUp_0.4s_ease-out] space-y-10">
       {/* Hero */}
-      <section className="relative overflow-hidden rounded-3xl border border-zinc-800/80 bg-gradient-to-br from-zinc-900/80 via-zinc-900/40 to-zinc-950 p-8">
-        <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-violet-600/20 blur-3xl" />
-        <div className="absolute -bottom-20 left-1/3 h-56 w-56 rounded-full bg-sky-600/10 blur-3xl" />
+      <section className="ring-gradient relative overflow-hidden rounded-3xl border border-white/8 bg-white/[0.03] p-8 backdrop-blur-sm">
+        <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-violet-600/25 blur-3xl" />
+        <div className="absolute -bottom-24 left-1/4 h-56 w-56 rounded-full bg-sky-600/15 blur-3xl" />
         <div className="relative">
           <p className="text-sm text-zinc-500">{today}</p>
-          <h1 className="mt-1 text-3xl font-semibold text-zinc-50">{greeting()}.</h1>
-          <p className="mt-2 max-w-xl text-zinc-400">
+          <h1 className="mt-1 text-4xl font-semibold tracking-tight">
+            <span className="text-gradient">{greeting()}.</span>
+          </h1>
+          <p className="mt-3 max-w-xl text-zinc-400">
             {stats.total === 0
               ? "This is your personal operating system. Capture a decision, a lesson, or a question — and watch your thinking compound over the years."
               : `You've captured ${stats.total} ${stats.total === 1 ? "moment" : "moments"} so far. Every one makes the next insight sharper.`}
@@ -51,13 +53,13 @@ export default async function Home() {
           <div className="mt-5 flex flex-wrap gap-2">
             <Link
               href="/capture"
-              className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-violet-500"
+              className="press glow-violet rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 px-4 py-2.5 text-sm font-medium text-white"
             >
               ＋ Capture something
             </Link>
             <Link
               href="/reflect"
-              className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-200 transition-colors hover:bg-zinc-800"
+              className="press rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-zinc-200 hover:bg-white/10"
             >
               🔮 Reflect on your week
             </Link>
@@ -66,26 +68,7 @@ export default async function Home() {
       </section>
 
       {/* Area stats */}
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        {TYPE_LIST.map((t) => {
-          const a = accent(t.accent);
-          const count = stats.byType[t.type] ?? 0;
-          return (
-            <Link
-              key={t.type}
-              href={`/${t.slug}`}
-              className={cn(
-                "group relative overflow-hidden rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-4 transition-all hover:-translate-y-0.5 hover:border-zinc-700",
-              )}
-            >
-              <div className={cn("absolute inset-x-0 top-0 h-0.5", a.dot)} />
-              <div className="mb-2 text-2xl">{t.icon}</div>
-              <div className="text-2xl font-semibold text-zinc-50">{count}</div>
-              <div className="text-xs text-zinc-500">{t.plural}</div>
-            </Link>
-          );
-        })}
-      </section>
+      <StatGrid counts={stats.byType} />
 
       <div className="grid gap-8 lg:grid-cols-[1fr_300px]">
         {/* Recent */}
