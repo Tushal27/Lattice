@@ -1,17 +1,21 @@
 import { PrismaClient } from "@/generated/prisma/client";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { PrismaLibSql } from "@prisma/adapter-libsql";
 
-// The Prisma 7 driver-adapter model: the connection URL is passed to the
-// adapter rather than living in the schema. We fall back to a sensible default
-// so the app runs on a fresh clone even before a local `.env` exists.
-const url = process.env.DATABASE_URL ?? "file:./dev.db";
+// One adapter for every environment. libSQL speaks SQLite, so the same code
+// path serves a local file in development and a hosted Turso database in
+// production — just by swapping environment variables:
+//
+//   Local:  DATABASE_URL=file:./dev.db
+//   Turso:  TURSO_DATABASE_URL=libsql://<db>.turso.io  +  TURSO_AUTH_TOKEN=...
+const url = process.env.TURSO_DATABASE_URL ?? process.env.DATABASE_URL ?? "file:./dev.db";
+const authToken = process.env.TURSO_AUTH_TOKEN;
 
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
 };
 
 function createPrisma() {
-  const adapter = new PrismaBetterSqlite3({ url });
+  const adapter = new PrismaLibSql({ url, ...(authToken ? { authToken } : {}) });
   return new PrismaClient({ adapter });
 }
 

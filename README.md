@@ -36,7 +36,7 @@ To install: open the deployed URL on your phone → browser menu → **Add to Ho
 ## Tech
 
 - **Next.js 16** (App Router, React 19, TypeScript)
-- **SQLite** via **Prisma 7** (driver-adapter / `better-sqlite3`) — local-first, no external database
+- **SQLite / libSQL** via **Prisma 7** (libSQL driver adapter) — a local file in development, a hosted **Turso** database in production, with the exact same code path
 - **Tailwind CSS v4**
 - **Gemini** for the AI features, called over plain HTTP with a graceful local fallback
 
@@ -71,7 +71,41 @@ Until then, those features fall back to local heuristics (tag/keyword-based sugg
 | `npm run db:setup` | Apply migrations (creates `dev.db`) |
 | `npm run db:seed` | Load sample data |
 | `npm run db:reset` | Drop and recreate the database |
+| `npm run db:turso` | Apply the schema to a hosted Turso database |
 | `npm run lint` | Lint |
+
+## Deploy (so you can install it on your phone)
+
+A PWA installs from a hosted URL, and serverless hosts have an ephemeral
+filesystem — so production uses a hosted **Turso** (libSQL) database instead of
+a local file. Nothing in the app code changes; it's all environment variables.
+
+1. **Create a Turso database** (free tier):
+   ```bash
+   # https://docs.turso.tech/quickstart
+   turso db create lattice
+   turso db show lattice --url          # -> TURSO_DATABASE_URL (libsql://…)
+   turso db tokens create lattice       # -> TURSO_AUTH_TOKEN
+   ```
+
+2. **Apply the schema** to it (one time):
+   ```bash
+   TURSO_DATABASE_URL="libsql://…" TURSO_AUTH_TOKEN="…" npm run db:turso
+   ```
+
+3. **Deploy to Vercel** (or any Next.js host): import the repo, and set these
+   environment variables in the project settings:
+   - `TURSO_DATABASE_URL`
+   - `TURSO_AUTH_TOKEN`
+   - `GEMINI_API_KEY` (optional, for AI features)
+
+   The build runs `prisma generate` automatically via `postinstall`; no database
+   is touched at build time.
+
+4. **Install on your phone**: open the deployed URL → **Add to Home Screen**.
+
+> When `TURSO_DATABASE_URL` is set, the app uses it; otherwise it falls back to
+> the local `DATABASE_URL` file. The same libSQL adapter handles both.
 
 ## Project structure
 
@@ -85,6 +119,8 @@ src/
     entries.ts         data access, tags, search, connection suggestions
     companion.ts       AI orchestration (reflection, connect, ask) with fallbacks
     ai.ts              Gemini REST client
-    db.ts              Prisma client + sqlite adapter
+    db.ts              Prisma client + libSQL adapter (local file or Turso)
 prisma/                schema, migrations, seed
+scripts/               migrate-turso.mjs (apply schema to a hosted Turso db)
+public/                PWA manifest icons + service worker (sw.js)
 ```

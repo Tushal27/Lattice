@@ -10,10 +10,12 @@
     "postinstall": "prisma generate",
     "db:setup": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
-    "db:reset": "prisma migrate reset --force"
+    "db:reset": "prisma migrate reset --force",
+    "db:turso": "node scripts/migrate-turso.mjs"
   },
   "dependencies": {
-    "@prisma/adapter-better-sqlite3": "^7.8.0",
+    "@libsql/client": "^0.17.4",
+    "@prisma/adapter-libsql": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "next": "16.2.9",
     "prisma": "^7.8.0",
