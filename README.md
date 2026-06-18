@@ -29,7 +29,9 @@ On top of the areas:
 - **Reflections** — weekly and monthly reviews that turn recent activity into self-awareness.
 - **Thinking Partner** — an AI that helps you *think better*: find patterns, connect ideas, and challenge assumptions, drawing on your own entries.
 
-**Mobile-first.** Lattice is built to live on your phone: a thumb-reachable bottom tab bar, a central capture button, touch-friendly graph gestures, and responsive layouts throughout.
+**Mobile-first & installable (PWA).** Lattice is built to live on your phone: a thumb-reachable bottom tab bar, a central capture button, touch-friendly graph gestures, and responsive layouts throughout. It's an installable Progressive Web App with a home-screen icon, standalone (no browser chrome) display, app shortcuts, and a service worker that keeps pages you've already opened available offline.
+
+To install: open the deployed URL on your phone → browser menu → **Add to Home Screen**. On desktop Chrome, use the install icon in the address bar.
 
 ## Tech
 
