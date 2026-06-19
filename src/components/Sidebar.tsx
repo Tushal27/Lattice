@@ -95,7 +95,14 @@ export function Sidebar() {
         </button>
       </nav>
 
-      <div className="mt-4 px-3 text-[11px] text-zinc-600">Every lesson compounds.</div>
+      <button
+        onClick={() => window.dispatchEvent(new CustomEvent("lattice:open-guide"))}
+        className="mt-4 flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-zinc-400 transition-colors hover:bg-zinc-800/40 hover:text-zinc-200"
+      >
+        <span className="w-5 text-center text-base leading-none">❓</span>
+        <span>How to use</span>
+      </button>
+      <div className="mt-2 px-3 text-[11px] text-zinc-600">Every lesson compounds.</div>
     </aside>
   );
 }

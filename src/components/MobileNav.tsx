@@ -31,12 +31,21 @@ export function MobileNav() {
           </span>
           <span className="text-sm font-semibold tracking-tight">Lattice</span>
         </Link>
-        <button
-          onClick={openCommand}
-          className="press flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-zinc-400"
-        >
-          🔍 Find
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent("lattice:open-guide"))}
+            aria-label="How to use Lattice"
+            className="press grid h-8 w-8 place-items-center rounded-full border border-white/10 bg-white/5 text-sm text-zinc-400"
+          >
+            ?
+          </button>
+          <button
+            onClick={openCommand}
+            className="press flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-zinc-400"
+          >
+            🔍 Find
+          </button>
+        </div>
       </header>
 
       {/* Bottom tab bar with central capture button */}

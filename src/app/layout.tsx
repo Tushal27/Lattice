@@ -7,6 +7,7 @@ import { CommandPalette } from "@/components/CommandPalette";
 import { Toaster } from "@/components/Toast";
 import { ServiceWorker } from "@/components/ServiceWorker";
 import { FloatingChat } from "@/components/FloatingChat";
+import { Guide } from "@/components/Guide";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -52,6 +53,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         </div>
         <CommandPalette />
         <FloatingChat />
+        <Guide />
         <Toaster />
         <ServiceWorker />
       </body>

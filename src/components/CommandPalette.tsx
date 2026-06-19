@@ -110,6 +110,16 @@ export function CommandPalette() {
       keywords: "ai chat wonder partner",
     },
     { id: "nav-timeline", label: "Life Timeline", icon: "🧭", run: () => go("/timeline"), keywords: "history" },
+    {
+      id: "help",
+      label: "How to use Lattice",
+      icon: "❓",
+      run: () => {
+        close();
+        window.dispatchEvent(new CustomEvent("lattice:open-guide"));
+      },
+      keywords: "help guide onboarding tutorial",
+    },
   ];
 
   const q = query.trim().toLowerCase();
