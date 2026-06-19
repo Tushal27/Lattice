@@ -172,7 +172,7 @@ export function FloatingChat() {
       const data = await res.json();
       setMessages((m) =>
         m
-          .map((msg, k) => (k === index ? { ...msg, saved: true } : msg))
+          .map((msg, k) => (k === index ? { ...msg, saved: data.mutated === true } : msg))
           .concat([
             { role: "ai", mode: "capture", text: data.reply, source: data.source, provider: data.provider, steps: data.steps },
           ]),
@@ -375,14 +375,20 @@ export function FloatingChat() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
+                    // On desktop, Enter sends (Shift+Enter = newline). On touch
+                    // keyboards Enter inserts a newline; use the ↑ button to send.
+                    if (e.key !== "Enter" || e.shiftKey) return;
+                    const coarse =
+                      typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)")?.matches;
+                    if (!coarse) {
                       e.preventDefault();
                       send(input);
                     }
                   }}
                   rows={1}
-                  placeholder={mode === "wonder" ? "Think out loud…  (Shift+Enter for a new line)" : "Tell me what to capture, or paste a long note…"}
-                  className="max-h-40 min-h-[2.6rem] flex-1 resize-none rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-violet-400/50 focus:outline-none"
+                  enterKeyHint="enter"
+                  placeholder={mode === "wonder" ? "Think out loud…" : "Tell me what to capture, or paste a long note…"}
+                  className="max-h-40 min-h-[2.6rem] flex-1 resize-none overflow-y-auto rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-violet-400/50 focus:outline-none"
                 />
                 <MicButton value={input} onChange={setInput} className="h-10 w-10 shrink-0" />
                 <button

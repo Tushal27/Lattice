@@ -7,6 +7,7 @@
 // it can't run away or delete anything.
 
 import { aiEnabled, generateDetailed } from "@/lib/ai";
+import { jsonrepair } from "jsonrepair";
 import {
   addConnection,
   buildEntryInput,
@@ -87,8 +88,10 @@ export async function runAgent(
 
     const parsed = parseAgent(res.text);
     if (!parsed) {
-      // Model replied in prose instead of JSON — treat it as the answer.
-      reply = res.text.trim();
+      // If it looks like broken protocol JSON, never show that raw to the user.
+      reply = looksLikeProtocol(res.text)
+        ? "I had trouble completing that cleanly — could you try rephrasing or sending again?"
+        : res.text.trim();
       break;
     }
 
@@ -371,13 +374,32 @@ function parseAgent(raw: string): ParsedAgent | null {
   const start = cleaned.indexOf("{");
   const end = cleaned.lastIndexOf("}");
   if (start === -1 || end === -1) return null;
+  const slice = cleaned.slice(start, end + 1);
+
+  let obj: { actions?: unknown; reply?: unknown; done?: unknown } | null = null;
   try {
-    const obj = JSON.parse(cleaned.slice(start, end + 1));
-    const actions = Array.isArray(obj.actions)
-      ? obj.actions.filter((x: unknown) => x && typeof (x as { tool?: unknown }).tool === "string")
-      : [];
-    return { actions, reply: typeof obj.reply === "string" ? obj.reply : undefined, done: Boolean(obj.done) };
+    obj = JSON.parse(slice);
   } catch {
-    return null;
+    // Free models often emit JSON with raw newlines / trailing commas inside
+    // strings, which JSON.parse rejects. Repair, then retry.
+    try {
+      obj = JSON.parse(jsonrepair(slice));
+    } catch {
+      return null;
+    }
   }
+  if (!obj || typeof obj !== "object") return null;
+  const actions = Array.isArray(obj.actions)
+    ? (obj.actions as unknown[]).filter((x) => x && typeof (x as { tool?: unknown }).tool === "string")
+    : [];
+  return {
+    actions: actions as ParsedAgent["actions"],
+    reply: typeof obj.reply === "string" ? obj.reply : undefined,
+    done: Boolean(obj.done),
+  };
+}
+
+/** True if a model reply is (broken) protocol JSON rather than a real message. */
+function looksLikeProtocol(raw: string): boolean {
+  return /"\s*actions\s*"|"\s*tool\s*"/.test(raw);
 }

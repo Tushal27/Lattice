@@ -1,3 +1,4 @@
+import { jsonrepair } from "jsonrepair";
 import { generate, generateDetailed, THINKING_PARTNER_SYSTEM } from "@/lib/ai";
 import { entriesInRange, getEntry, listEntries, suggestConnections } from "@/lib/entries";
 import { TYPES } from "@/lib/types";
@@ -167,10 +168,15 @@ function safeJson(raw: string): Record<string, unknown> | null {
   const start = cleaned.indexOf("{");
   const end = cleaned.lastIndexOf("}");
   if (start === -1 || end === -1) return null;
+  const slice = cleaned.slice(start, end + 1);
   try {
-    return JSON.parse(cleaned.slice(start, end + 1));
+    return JSON.parse(slice);
   } catch {
-    return null;
+    try {
+      return JSON.parse(jsonrepair(slice));
+    } catch {
+      return null;
+    }
   }
 }
 
