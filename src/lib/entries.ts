@@ -291,7 +291,7 @@ export async function getStats() {
 }
 
 /** Decisions made a while ago that haven't been reviewed yet — prompt reflection. */
-export async function decisionsAwaitingReview(days = 30) {
+export async function decisionsAwaitingReview(days = 14) {
   const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
   const decisions = await prisma.entry.findMany({
     where: { type: "decision", createdAt: { lt: cutoff } },
