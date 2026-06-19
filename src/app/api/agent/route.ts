@@ -1,7 +1,7 @@
 import { runAgent, type AgentTurn } from "@/lib/agent";
 
 export async function POST(request: Request) {
-  let body: { message?: string; history?: AgentTurn[] };
+  let body: { message?: string; history?: AgentTurn[]; preserveRaw?: boolean };
   try {
     body = await request.json();
   } catch {
@@ -12,6 +12,6 @@ export async function POST(request: Request) {
   if (!message) return Response.json({ error: "message required" }, { status: 400 });
 
   const history = Array.isArray(body.history) ? body.history.slice(-8) : [];
-  const result = await runAgent(message, history);
+  const result = await runAgent(message, history, { preserveRaw: body.preserveRaw !== false });
   return Response.json(result);
 }

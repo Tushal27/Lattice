@@ -54,7 +54,11 @@ interface ParsedAgent {
 
 const WRITE_TOOLS = new Set(["create_entry", "update_entry", "connect_entries"]);
 
-export async function runAgent(message: string, history: AgentTurn[] = []): Promise<AgentResult> {
+export async function runAgent(
+  message: string,
+  history: AgentTurn[] = [],
+  opts: { preserveRaw?: boolean } = {},
+): Promise<AgentResult> {
   if (!aiEnabled()) {
     return {
       reply:
@@ -68,6 +72,7 @@ export async function runAgent(message: string, history: AgentTurn[] = []): Prom
   const context = await buildContext();
   const steps: ExecutedStep[] = [];
   const readResults: string[] = [];
+  const createdTitles = new Set<string>();
   let reply = "";
   let provider: string | undefined;
 
@@ -87,17 +92,29 @@ export async function runAgent(message: string, history: AgentTurn[] = []): Prom
       break;
     }
 
+    let didWrite = false;
     for (const action of parsed.actions) {
       if (steps.length >= 12) break;
-      const step = await execute(action);
+      // Guard against the model re-creating the same entry in a runaway loop.
+      if (action.tool === "create_entry") {
+        const t = String(action.args?.title ?? "").trim().toLowerCase();
+        if (t && createdTitles.has(t)) continue;
+      }
+      const step = await execute(action, { preserveRaw: opts.preserveRaw, rawText: message });
       steps.push(step);
+      if (step.ok && WRITE_TOOLS.has(action.tool)) {
+        didWrite = true;
+        if (action.tool === "create_entry" && step.entryTitle) createdTitles.add(step.entryTitle.toLowerCase());
+      }
       if (step.ok && !WRITE_TOOLS.has(action.tool) && step.summary) {
         readResults.push(step.summary);
       }
     }
 
     if (parsed.reply) reply = parsed.reply;
-    if (parsed.done || parsed.actions.length === 0) break;
+    // Once anything has been written, stop — prevents duplicate creates and
+    // retry loops on a failed connect.
+    if (didWrite || parsed.done || parsed.actions.length === 0) break;
   }
 
   return {
@@ -111,12 +128,20 @@ export async function runAgent(message: string, history: AgentTurn[] = []): Prom
 
 // ---- tool execution --------------------------------------------------------
 
-async function execute(action: { tool: string; args: Record<string, unknown> }): Promise<ExecutedStep> {
+interface ExecOpts {
+  preserveRaw?: boolean;
+  rawText?: string;
+}
+
+async function execute(
+  action: { tool: string; args: Record<string, unknown> },
+  opts: ExecOpts = {},
+): Promise<ExecutedStep> {
   const a = action.args ?? {};
   try {
     switch (action.tool) {
       case "create_entry":
-        return await createTool(a);
+        return await createTool(a, opts);
       case "update_entry":
         return await updateTool(a);
       case "connect_entries":
@@ -144,10 +169,17 @@ function flatten(args: Record<string, unknown>): Record<string, unknown> {
   return { ...fields, ...top };
 }
 
-async function createTool(args: Record<string, unknown>): Promise<ExecutedStep> {
+async function createTool(args: Record<string, unknown>, opts: ExecOpts = {}): Promise<ExecutedStep> {
   const type = String(args.type ?? "");
   if (!isEntryType(type)) return { tool: "create_entry", ok: false, summary: `Unknown type "${type}"` };
-  const input = buildEntryInput(type, flatten(args));
+  const flat = flatten(args);
+  // For a direct capture, guarantee the user's full text survives even if the
+  // model abbreviated it — keep everything in `details`.
+  if (opts.preserveRaw && opts.rawText) {
+    const modelDetails = String(flat.details ?? "");
+    if (modelDetails.length < opts.rawText.length * 0.8) flat.details = opts.rawText;
+  }
+  const input = buildEntryInput(type, flat);
   if (!input || !input.title) return { tool: "create_entry", ok: false, summary: "A title is required" };
   const entry = await createEntry(input);
   const label = TYPES[type].label;
@@ -192,9 +224,14 @@ async function updateTool(args: Record<string, unknown>): Promise<ExecutedStep> 
 async function connectTool(args: Record<string, unknown>): Promise<ExecutedStep> {
   const fromId = String(args.fromId ?? "");
   const toId = String(args.toId ?? "");
-  if (!fromId || !toId) return { tool: "connect_entries", ok: false, summary: "Need fromId and toId" };
+  if (!fromId || !toId) return { tool: "connect_entries", ok: false, summary: "Need two entries to link" };
+  if (fromId === toId) return { tool: "connect_entries", ok: false, summary: "Can't link an entry to itself" };
+  // Validate both exist so a bad/invented id returns a clean message instead of
+  // a raw foreign-key error.
+  const [a, b] = await Promise.all([getEntry(fromId), getEntry(toId)]);
+  if (!a || !b) return { tool: "connect_entries", ok: false, summary: "Couldn't link — entry not found" };
   await addConnection(fromId, toId, args.note ? String(args.note) : null);
-  return { tool: "connect_entries", ok: true, summary: "Linked two entries" };
+  return { tool: "connect_entries", ok: true, summary: `Linked “${a.title}” ↔ “${b.title}”` };
 }
 
 async function searchTool(args: Record<string, unknown>): Promise<ExecutedStep> {
@@ -317,14 +354,14 @@ const AGENT_SYSTEM = [
   typeSchema(),
   "",
   "Rules:",
-  "- PRESERVE THE USER'S CONTENT. Never crush a long, detailed message into a vague one-liner. Keep their specifics, lists, names, numbers and structure.",
-  "- Put the full body of what they wrote into the long-text fields — and ALWAYS copy the complete original message (lightly formatted, nothing dropped) into the `details` field. The `summary` is a one-line headline; `details` holds everything.",
+  "- PRESERVE MEANING, don't crush it. Write a strong, specific title and a one-line summary, and fill the structured fields with the real specifics (lists, names, numbers).",
+  "- You do NOT need to copy the user's entire message verbatim — the system automatically keeps their full original text in `details`. Focus on a great title, summary, type, and tags. For very long pastes, keep your JSON compact.",
   "- For a big dump (work log, brain dump), prefer creating ONE rich entry that keeps it all rather than several thin ones, unless the user clearly lists separate items.",
   "- Fill EVERY relevant field. Be generous and specific: a real title, a one-line summary, context/reasoning, 2-4 lowercase tags. Leave a field empty only if the user truly gave nothing for it (do not write 'none').",
   "- For decisions, estimate a confidence (0-100) from how sure they sound.",
-  "- Only use ids that appear in the context or in lookup results — never invent ids.",
-  "- Use read tools first only when you need an existing id; otherwise act directly.",
-  "- After your write actions are done, set done=true and give a short, friendly reply describing what you saved.",
+  "- When the user is simply capturing a thought, create ONE entry and STOP — do not connect, search, or create extras. Set done=true.",
+  "- Only connect_entries when the user explicitly asks to link things, and only with real ids from the context or a search result. NEVER invent ids or use a title as an id. If you don't have a real id, don't connect.",
+  "- Do each write at most once. After your write actions, set done=true and give a short, friendly reply describing what you saved.",
   "- If the user is just chatting or asking about their data, use read tools or none, answer in `reply`, and set done=true.",
   "- Never delete anything. Keep replies under ~3 sentences.",
 ].join("\n");

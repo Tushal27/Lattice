@@ -195,14 +195,24 @@ function heuristicClassify(text: string): Omit<Classification, "source"> {
   return { type, title, summary: text.length > title.length ? text.slice(0, 200) : "", tags: [] };
 }
 
-export async function askPartner(message: string): Promise<SourcedText & { provider?: string }> {
+export async function askPartner(
+  message: string,
+  history: { role: string; text: string }[] = [],
+): Promise<SourcedText & { provider?: string }> {
   const recent = await listEntries({ limit: 40 });
+  const convo = history
+    .slice(-10)
+    .map((t) => `${t.role === "you" ? "Me" : "You"}: ${t.text}`)
+    .join("\n");
   const prompt = [
-    "Here is recent context from my personal operating system:",
+    "Recent context from my personal operating system (my entries):",
     digest(recent),
     "",
-    "My message to you:",
+    ...(convo ? ["Our conversation so far:", convo, ""] : []),
+    "My new message:",
     message,
+    "",
+    "Reply as a continuation of our conversation — keep the thread, don't restart.",
   ].join("\n");
 
   const ai = await generateDetailed(prompt, { system: THINKING_PARTNER_SYSTEM, temperature: 0.8 });

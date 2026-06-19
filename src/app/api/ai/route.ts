@@ -22,7 +22,10 @@ export async function POST(request: Request) {
     case "ask": {
       const message = String(body.message ?? "").trim();
       if (!message) return Response.json({ error: "message required" }, { status: 400 });
-      return Response.json(await askPartner(message));
+      const history = Array.isArray(body.history)
+        ? (body.history as { role: string; text: string }[]).slice(-10)
+        : [];
+      return Response.json(await askPartner(message, history));
     }
     case "classify": {
       const text = String(body.text ?? "").trim();

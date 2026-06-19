@@ -55,6 +55,7 @@ export function FloatingChat() {
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const constraintsRef = useRef<HTMLDivElement>(null);
+  const taRef = useRef<HTMLTextAreaElement>(null);
 
   // Draggable launcher position, remembered across reloads.
   const fabX = useMotionValue(0);
@@ -103,6 +104,14 @@ export function FloatingChat() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, loading]);
 
+  // Auto-grow the composer with its content (capped), and reset after sending.
+  useEffect(() => {
+    const el = taRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 160) + "px";
+  }, [input, open]);
+
   async function send(text: string) {
     const message = text.trim();
     if (!message || loading) return;
@@ -117,7 +126,7 @@ export function FloatingChat() {
         const res = await fetch("/api/ai", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ task: "ask", message }),
+          body: JSON.stringify({ task: "ask", message, history }),
         });
         const data = await res.json();
         setMessages((m) => [
@@ -128,7 +137,7 @@ export function FloatingChat() {
         const res = await fetch("/api/agent", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message, history }),
+          body: JSON.stringify({ message, history, preserveRaw: true }),
         });
         const data = await res.json();
         setMessages((m) => [
@@ -157,6 +166,7 @@ export function FloatingChat() {
           message:
             "Save the most important insight or takeaway from our conversation as a Lattice entry. Choose the best type and keep the detail.",
           history,
+          preserveRaw: false,
         }),
       });
       const data = await res.json();
@@ -359,12 +369,20 @@ export function FloatingChat() {
               }}
               className="border-t border-white/10"
             >
-              <div className="mx-auto flex w-full max-w-2xl items-center gap-2 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-                <input
+              <div className="mx-auto flex w-full max-w-2xl items-end gap-2 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                <textarea
+                  ref={taRef}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder={mode === "wonder" ? "Think out loud…" : "Tell me what to capture, or ask…"}
-                  className="flex-1 rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-violet-400/50 focus:outline-none"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      send(input);
+                    }
+                  }}
+                  rows={1}
+                  placeholder={mode === "wonder" ? "Think out loud…  (Shift+Enter for a new line)" : "Tell me what to capture, or paste a long note…"}
+                  className="max-h-40 min-h-[2.6rem] flex-1 resize-none rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-violet-400/50 focus:outline-none"
                 />
                 <MicButton value={input} onChange={setInput} className="h-10 w-10 shrink-0" />
                 <button
