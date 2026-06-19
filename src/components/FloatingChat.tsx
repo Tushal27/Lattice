@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useDragControls } from "motion/react";
 import { Markdown } from "@/components/Markdown";
 import { MicButton } from "@/components/MicButton";
 import { TYPES, type EntryType } from "@/lib/types";
@@ -41,6 +41,8 @@ export function FloatingChat() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const constraintsRef = useRef<HTMLDivElement>(null);
+  const dragControls = useDragControls();
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -49,7 +51,7 @@ export function FloatingChat() {
   async function send(text: string) {
     const message = text.trim();
     if (!message || loading) return;
-    window.dispatchEvent(new CustomEvent("lattice:stt-stop")); // stop any dictation
+    window.dispatchEvent(new CustomEvent("lattice:stt-stop"));
     const history = messages.map((m) => ({ role: m.role, text: m.text }));
     setMessages((m) => [...m, { role: "you", text: message }]);
     setInput("");
@@ -90,31 +92,38 @@ export function FloatingChat() {
         <span className="relative">✦</span>
       </motion.button>
 
-      <AnimatePresence>
-        {open && (
-          <>
+      {/* Full-viewport drag bounds; pointer-events-none so the app behind stays usable. */}
+      <div ref={constraintsRef} className="pointer-events-none fixed inset-0 z-50">
+        <AnimatePresence>
+          {open && (
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setOpen(false)}
-              className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ y: "100%", opacity: 0.5 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: "100%", opacity: 0.5 }}
-              transition={{ type: "spring", damping: 30, stiffness: 320 }}
-              className="glass fixed inset-x-0 bottom-0 z-50 flex h-[85dvh] flex-col overflow-hidden rounded-t-3xl md:inset-x-auto md:bottom-6 md:right-6 md:h-[600px] md:w-[420px] md:rounded-3xl"
+              drag
+              dragControls={dragControls}
+              dragListener={false}
+              dragMomentum={false}
+              dragConstraints={constraintsRef}
+              dragElastic={0.04}
+              initial={{ y: 40, opacity: 0, scale: 0.96 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: 40, opacity: 0, scale: 0.96 }}
+              transition={{ type: "spring", damping: 28, stiffness: 320 }}
+              className="glass pointer-events-auto absolute bottom-20 right-4 flex h-[68dvh] w-[92vw] max-w-[400px] flex-col overflow-hidden rounded-3xl shadow-2xl md:bottom-6 md:right-6 md:h-[560px]"
             >
-              {/* Header */}
-              <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+              {/* Header (drag handle) */}
+              <div
+                onPointerDown={(e) => dragControls.start(e)}
+                style={{ touchAction: "none" }}
+                className="flex cursor-grab items-center justify-between border-b border-white/10 px-4 py-3 active:cursor-grabbing"
+              >
                 <div className="flex items-center gap-3">
                   <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-sky-500 text-lg">
                     ✦
                   </span>
                   <div>
-                    <div className="text-sm font-semibold text-zinc-100">Lattice Agent</div>
+                    <div className="flex items-center gap-1.5 text-sm font-semibold text-zinc-100">
+                      Lattice Agent
+                      <span className="text-zinc-600">⠿</span>
+                    </div>
                     <div className="flex items-center gap-1.5 text-[11px] text-zinc-400">
                       {lastAi ? (
                         lastAi.source === "ai" ? (
@@ -129,7 +138,7 @@ export function FloatingChat() {
                         )
                       ) : (
                         <>
-                          <span className="h-1.5 w-1.5 rounded-full bg-zinc-500" /> tell me what happened
+                          <span className="h-1.5 w-1.5 rounded-full bg-zinc-500" /> drag me · tell me what happened
                         </>
                       )}
                     </div>
@@ -147,12 +156,9 @@ export function FloatingChat() {
               {/* Messages */}
               <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
                 {messages.length === 0 && (
-                  <div className="pt-4 text-center">
-                    <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-violet-500/20 to-sky-500/20 text-2xl">
-                      ✦
-                    </div>
+                  <div className="pt-2 text-center">
                     <p className="mx-auto max-w-[17rem] text-sm text-zinc-400">
-                      Tell me what happened in plain words — I&apos;ll file it into the right place with all the fields. Or ask about your data.
+                      Tell me what happened in plain words — I&apos;ll file it with all the detail kept. Or ask about your data.
                     </p>
                     <div className="mt-4 flex flex-col gap-2">
                       {SUGGESTIONS.map((s) => (
@@ -181,7 +187,6 @@ export function FloatingChat() {
                         {m.role === "ai" ? <Markdown>{m.text}</Markdown> : m.text}
                       </div>
                     </div>
-                    {/* Action cards */}
                     {m.role === "ai" && m.steps && (
                       <div className="mt-2 flex flex-col gap-1.5">
                         {m.steps
@@ -232,9 +237,9 @@ export function FloatingChat() {
                 </button>
               </form>
             </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
+      </div>
     </>
   );
 }

@@ -51,6 +51,7 @@ const decision: TypeConfig = {
     { key: "expected", label: "Expected outcome", kind: "textarea", placeholder: "What you think will happen" },
     { key: "confidence", label: "Confidence (0–100)", kind: "number", column: true, help: "How sure are you, right now?" },
     { key: "occurredAt", label: "Date decided", kind: "date", column: true },
+    { key: "details", label: "Details", kind: "textarea", placeholder: "The full story — nothing gets trimmed." },
     { key: "reviewOutcome", label: "What actually happened", kind: "textarea", review: true, placeholder: "Review later" },
     { key: "reviewVerdict", label: "Was it the right call?", kind: "select", review: true, options: ["", "Right call", "Mixed", "Wrong call", "Too early to tell"] },
     { key: "reviewLearning", label: "What you'd do differently", kind: "textarea", review: true },
@@ -74,6 +75,7 @@ const lesson: TypeConfig = {
     { key: "rootCause", label: "Root cause", kind: "textarea", placeholder: "Why it really happened" },
     { key: "lesson", label: "What you learned", kind: "textarea" },
     { key: "prevention", label: "How to avoid repeating it", kind: "textarea" },
+    { key: "details", label: "Details", kind: "textarea", placeholder: "The full story — nothing gets trimmed." },
     { key: "occurredAt", label: "When", kind: "date", column: true },
   ],
 };
@@ -92,6 +94,7 @@ const aha: TypeConfig = {
     { key: "summary", label: "In a sentence", kind: "text", column: true },
     { key: "trigger", label: "What triggered it", kind: "textarea", placeholder: "What were you doing or reading?" },
     { key: "detail", label: "Explain the realization", kind: "textarea" },
+    { key: "details", label: "Details", kind: "textarea", placeholder: "The full story — nothing gets trimmed." },
     { key: "occurredAt", label: "When", kind: "date", column: true },
   ],
 };
@@ -110,6 +113,7 @@ const question: TypeConfig = {
     { key: "status", label: "Status", kind: "select", column: true, options: ["open", "exploring", "answered"] },
     { key: "why", label: "Why it matters", kind: "textarea", placeholder: "What sparked it / why you care" },
     { key: "answer", label: "Findings", kind: "textarea", placeholder: "Add what you learn as you go" },
+    { key: "details", label: "Details", kind: "textarea", placeholder: "The full story — nothing gets trimmed." },
   ],
 };
 
@@ -128,6 +132,7 @@ const project: TypeConfig = {
     { key: "summary", label: "What is it?", kind: "text", column: true },
     { key: "goal", label: "Goal / definition of done", kind: "textarea" },
     { key: "reflection", label: "Reflections", kind: "textarea", placeholder: "How it's going, what you're noticing" },
+    { key: "details", label: "Details", kind: "textarea", placeholder: "The full story — nothing gets trimmed." },
     { key: "occurredAt", label: "Started", kind: "date", column: true },
   ],
 };
