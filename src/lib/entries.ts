@@ -371,17 +371,31 @@ export async function onThisDay() {
 }
 
 /**
- * Deterministically resurfaces a few older lessons/insights each day so wisdom
- * doesn't get buried. The selection rotates by day but is stable within a day.
+ * Deterministically resurfaces a few lessons/insights each day so wisdom doesn't
+ * get buried. Prefers entries older than two weeks, but falls back to whatever
+ * lessons/aha/decisions exist — so a new user still gets value from day one.
+ * The selection rotates by day but is stable within a day.
  */
 export async function resurface(limit = 3) {
+  const where = { type: { in: ["lesson", "aha", "decision"] } };
   const cutoff = new Date(Date.now() - 14 * 86_400_000);
-  const pool = await prisma.entry.findMany({
-    where: { type: { in: ["lesson", "aha", "decision"] }, createdAt: { lt: cutoff } },
+
+  let pool = await prisma.entry.findMany({
+    where: { ...where, createdAt: { lt: cutoff } },
     orderBy: { createdAt: "asc" },
     include: { tags: { include: { tag: true } } },
   });
+
+  // Not enough "aged" entries yet — fall back to all of them.
+  if (pool.length < limit) {
+    pool = await prisma.entry.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      include: { tags: { include: { tag: true } } },
+    });
+  }
   if (pool.length === 0) return [];
+
   const dayIndex = Math.floor(Date.now() / 86_400_000);
   const picked = new Map<string, (typeof pool)[number]>();
   for (let i = 0; i < Math.min(limit, pool.length); i++) {
