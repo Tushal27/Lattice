@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion, useDragControls } from "motion/react";
+import { AnimatePresence, motion, useDragControls, useMotionValue } from "motion/react";
 import { Markdown } from "@/components/Markdown";
 import { MicButton } from "@/components/MicButton";
 import { TYPES, type EntryType } from "@/lib/types";
@@ -44,6 +44,27 @@ export function FloatingChat() {
   const constraintsRef = useRef<HTMLDivElement>(null);
   const dragControls = useDragControls();
 
+  // Draggable launcher position, remembered across reloads.
+  const fabX = useMotionValue(0);
+  const fabY = useMotionValue(0);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("lattice:fab");
+      if (saved) {
+        const p = JSON.parse(saved);
+        if (typeof p.x === "number") fabX.set(p.x);
+        if (typeof p.y === "number") fabY.set(p.y);
+      }
+    } catch {}
+  }, [fabX, fabY]);
+
+  function persistFab() {
+    try {
+      localStorage.setItem("lattice:fab", JSON.stringify({ x: fabX.get(), y: fabY.get() }));
+    } catch {}
+  }
+
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, loading]);
@@ -79,21 +100,28 @@ export function FloatingChat() {
 
   return (
     <>
-      <motion.button
-        onClick={() => setOpen(true)}
-        initial={false}
-        animate={{ opacity: open ? 0 : 1, scale: open ? 0.6 : 1 }}
-        whileTap={{ scale: 0.88 }}
-        aria-label="Open AI agent"
-        className="glow-violet fixed bottom-24 right-4 z-40 grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br from-violet-500 via-violet-600 to-sky-600 text-2xl md:bottom-6 md:right-6"
-        style={{ pointerEvents: open ? "none" : "auto" }}
-      >
-        <span className="absolute inset-0 animate-ping rounded-full bg-violet-500/30 [animation-duration:3s]" />
-        <span className="relative">✦</span>
-      </motion.button>
-
       {/* Full-viewport drag bounds; pointer-events-none so the app behind stays usable. */}
       <div ref={constraintsRef} className="pointer-events-none fixed inset-0 z-50">
+        {/* Draggable launcher — tap to open, drag to move anywhere. */}
+        <motion.button
+          drag
+          dragConstraints={constraintsRef}
+          dragMomentum={false}
+          dragElastic={0.05}
+          onDragEnd={persistFab}
+          onTap={() => setOpen(true)}
+          initial={false}
+          animate={{ opacity: open ? 0 : 1, scale: open ? 0.6 : 1 }}
+          whileDrag={{ scale: 1.12 }}
+          whileTap={{ scale: 0.9 }}
+          aria-label="Open AI agent (drag to move)"
+          style={{ x: fabX, y: fabY, touchAction: "none", pointerEvents: open ? "none" : "auto" }}
+          className="glow-violet absolute bottom-24 right-4 grid h-14 w-14 cursor-grab place-items-center rounded-full bg-gradient-to-br from-violet-500 via-violet-600 to-sky-600 text-2xl active:cursor-grabbing md:bottom-6 md:right-6"
+        >
+          <span className="absolute inset-0 animate-ping rounded-full bg-violet-500/30 [animation-duration:3s]" />
+          <span className="relative">✦</span>
+        </motion.button>
+
         <AnimatePresence>
           {open && (
             <motion.div
