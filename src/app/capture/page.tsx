@@ -26,7 +26,7 @@ export default async function CapturePage(props: PageProps<"/capture">) {
           <span className="h-px flex-1 bg-zinc-800" /> or pick an area <span className="h-px flex-1 bg-zinc-800" />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {TYPE_LIST.map((t) => {
             const a = accent(t.accent);
             return (

@@ -71,7 +71,7 @@ export default async function EntryPage(props: PageProps<"/entry/[id]">) {
         ← {cfg.plural}
       </Link>
 
-      <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0">
           <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
@@ -125,7 +125,7 @@ export default async function EntryPage(props: PageProps<"/entry/[id]">) {
               {contentFields.map((f) => (
                 <div key={f.key}>
                   <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500">{f.label}</h3>
-                  <p className="whitespace-pre-line break-words text-zinc-200">{values[f.key]}</p>
+                  <p className="whitespace-pre-line [overflow-wrap:anywhere] text-zinc-200">{values[f.key]}</p>
                 </div>
               ))}
             </div>
@@ -161,11 +161,11 @@ export default async function EntryPage(props: PageProps<"/entry/[id]">) {
                 <div className="mb-4 grid gap-3 sm:grid-cols-2">
                   <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-3">
                     <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500">Expected</h4>
-                    <p className="whitespace-pre-line break-words text-sm text-zinc-300">{values.expected || "—"}</p>
+                    <p className="whitespace-pre-line [overflow-wrap:anywhere] text-sm text-zinc-300">{values.expected || "—"}</p>
                   </div>
                   <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
                     <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-300/70">What actually happened</h4>
-                    <p className="whitespace-pre-line break-words text-sm text-zinc-200">{values.reviewOutcome || "—"}</p>
+                    <p className="whitespace-pre-line [overflow-wrap:anywhere] text-sm text-zinc-200">{values.reviewOutcome || "—"}</p>
                   </div>
                 </div>
               )}
@@ -175,7 +175,7 @@ export default async function EntryPage(props: PageProps<"/entry/[id]">) {
                   <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-300/70">
                     What you&apos;d do differently
                   </h4>
-                  <p className="whitespace-pre-line break-words text-zinc-200">{values.reviewLearning}</p>
+                  <p className="whitespace-pre-line [overflow-wrap:anywhere] text-zinc-200">{values.reviewLearning}</p>
                 </div>
               )}
             </Card>

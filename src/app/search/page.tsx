@@ -25,7 +25,7 @@ export default async function SearchPage(props: PageProps<"/search">) {
             <p className="mb-4 text-sm text-zinc-500">
               {results.length} {results.length === 1 ? "result" : "results"} for “{query}”
             </p>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {results.map((entry) => (
                 <EntryCard key={entry.id} entry={entry} />
               ))}

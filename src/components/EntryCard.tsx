@@ -41,7 +41,7 @@ export function EntryCard({ entry }: { entry: EntryCardData }) {
             <TypeBadge type={entry.type} />
             <span className="text-[11px] text-zinc-500">{relativeTime(entry.createdAt)}</span>
           </div>
-          <h3 className="font-medium leading-snug text-zinc-100 group-hover:text-white">{entry.title}</h3>
+          <h3 className="break-words font-medium leading-snug text-zinc-100 group-hover:text-white">{entry.title}</h3>
           {entry.summary && <p className="mt-1 text-sm text-zinc-400">{truncate(entry.summary, 140)}</p>}
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-zinc-500">
             {entry.status && (

@@ -71,7 +71,7 @@ export default async function Home() {
       {/* Area stats */}
       <StatGrid counts={stats.byType} />
 
-      <div className="grid gap-8 lg:grid-cols-[1fr_300px]">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
         {/* Recent */}
         <section>
           <div className="mb-4 flex items-center justify-between">
@@ -88,7 +88,7 @@ export default async function Home() {
               </Link>
             </div>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {recent.map((entry) => (
                 <EntryCard key={entry.id} entry={entry} />
               ))}

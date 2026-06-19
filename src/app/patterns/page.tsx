@@ -82,7 +82,7 @@ export default async function PatternsPage() {
     <div className="animate-[fadeUp_0.4s_ease-out] space-y-6">
       <PageHeader icon="📊" accentColor="sky" title="Patterns" subtitle="How you think, learn, and decide — seen from above." />
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Area distribution */}
         <Card>
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-zinc-400">Where your attention goes</h2>

@@ -65,7 +65,7 @@ export default async function ReviewPage() {
         <section>
           <h2 className="mb-1 text-lg font-semibold text-zinc-100">🌱 Worth remembering today</h2>
           <p className="mb-4 text-sm text-zinc-500">Older lessons and insights, brought back so they keep working for you.</p>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {resurfaced.map((e) => (
               <EntryCard key={e.id} entry={e} />
             ))}
