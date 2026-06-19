@@ -7,6 +7,9 @@ import { AnimatePresence, motion, useDragControls, useMotionValue } from "motion
 import { Markdown } from "@/components/Markdown";
 import { MicButton } from "@/components/MicButton";
 import { TYPES, type EntryType } from "@/lib/types";
+import { cn } from "@/lib/utils";
+
+type Mode = "wonder" | "capture";
 
 interface Step {
   tool: string;
@@ -20,16 +23,25 @@ interface Step {
 interface Msg {
   role: "you" | "ai";
   text: string;
+  mode?: Mode;
   source?: "ai" | "local";
   provider?: string;
   steps?: Step[];
+  saved?: boolean;
 }
 
-const SUGGESTIONS = [
-  "I decided to drop the side project — low energy lately, fairly sure",
-  "I learned that shipping small beats planning big",
-  "What patterns do you see in my decisions?",
-];
+const SUGGESTIONS: Record<Mode, string[]> = {
+  wonder: [
+    "What patterns do you see in my decisions?",
+    "Help me think through a tradeoff I'm facing",
+    "Challenge an assumption I'm making",
+  ],
+  capture: [
+    "I decided to drop the side project — low energy lately, fairly sure",
+    "I learned that shipping small beats planning big",
+    "Add a question: how do marketplaces bootstrap supply?",
+  ],
+};
 
 const WRITE_TOOLS = new Set(["create_entry", "update_entry", "connect_entries"]);
 const VERB: Record<string, string> = { create_entry: "Created", update_entry: "Updated", connect_entries: "Linked" };
@@ -37,6 +49,7 @@ const VERB: Record<string, string> = { create_entry: "Created", update_entry: "U
 export function FloatingChat() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<Mode>("capture");
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -44,7 +57,6 @@ export function FloatingChat() {
   const constraintsRef = useRef<HTMLDivElement>(null);
   const dragControls = useDragControls();
 
-  // Draggable launcher position, remembered across reloads.
   const fabX = useMotionValue(0);
   const fabY = useMotionValue(0);
 
@@ -56,8 +68,18 @@ export function FloatingChat() {
         if (typeof p.x === "number") fabX.set(p.x);
         if (typeof p.y === "number") fabY.set(p.y);
       }
+      const savedMode = localStorage.getItem("lattice:mode");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (savedMode === "wonder" || savedMode === "capture") setMode(savedMode);
     } catch {}
   }, [fabX, fabY]);
+
+  function changeMode(m: Mode) {
+    setMode(m);
+    try {
+      localStorage.setItem("lattice:mode", m);
+    } catch {}
+  }
 
   function persistFab() {
     try {
@@ -73,24 +95,67 @@ export function FloatingChat() {
     const message = text.trim();
     if (!message || loading) return;
     window.dispatchEvent(new CustomEvent("lattice:stt-stop"));
+    const here = mode;
     const history = messages.map((m) => ({ role: m.role, text: m.text }));
     setMessages((m) => [...m, { role: "you", text: message }]);
     setInput("");
     setLoading(true);
     try {
+      if (here === "wonder") {
+        const res = await fetch("/api/ai", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ task: "ask", message }),
+        });
+        const data = await res.json();
+        setMessages((m) => [
+          ...m,
+          { role: "ai", mode: "wonder", text: data.text, source: data.source, provider: data.provider },
+        ]);
+      } else {
+        const res = await fetch("/api/agent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message, history }),
+        });
+        const data = await res.json();
+        setMessages((m) => [
+          ...m,
+          { role: "ai", mode: "capture", text: data.reply, source: data.source, provider: data.provider, steps: data.steps },
+        ]);
+        if (data.mutated) router.refresh();
+      }
+    } catch {
+      setMessages((m) => [...m, { role: "ai", text: "Couldn't reach the server. Try again.", source: "local" }]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // The bridge: turn a Wonder conversation (up to message `index`) into a saved entry.
+  async function saveThis(index: number) {
+    if (loading) return;
+    const history = messages.slice(0, index + 1).map((m) => ({ role: m.role, text: m.text }));
+    setLoading(true);
+    try {
       const res = await fetch("/api/agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, history }),
+        body: JSON.stringify({
+          message:
+            "Save the most important insight or takeaway from our conversation as a Lattice entry. Choose the best type and keep the detail.",
+          history,
+        }),
       });
       const data = await res.json();
-      setMessages((m) => [
-        ...m,
-        { role: "ai", text: data.reply, source: data.source, provider: data.provider, steps: data.steps },
-      ]);
+      setMessages((m) =>
+        m
+          .map((msg, k) => (k === index ? { ...msg, saved: true } : msg))
+          .concat([
+            { role: "ai", mode: "capture", text: data.reply, source: data.source, provider: data.provider, steps: data.steps },
+          ]),
+      );
       if (data.mutated) router.refresh();
-    } catch {
-      setMessages((m) => [...m, { role: "ai", text: "Couldn't reach the server. Try again.", source: "local" }]);
     } finally {
       setLoading(false);
     }
@@ -100,7 +165,6 @@ export function FloatingChat() {
 
   return (
     <>
-      {/* Full-viewport drag bounds; pointer-events-none so the app behind stays usable. */}
       <div ref={constraintsRef} className="pointer-events-none fixed inset-0 z-50">
         {/* Draggable launcher — tap to open, drag to move anywhere. */}
         <motion.button
@@ -149,8 +213,7 @@ export function FloatingChat() {
                   </span>
                   <div>
                     <div className="flex items-center gap-1.5 text-sm font-semibold text-zinc-100">
-                      Lattice Agent
-                      <span className="text-zinc-600">⠿</span>
+                      Lattice Agent <span className="text-zinc-600">⠿</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-[11px] text-zinc-400">
                       {lastAi ? (
@@ -166,7 +229,7 @@ export function FloatingChat() {
                         )
                       ) : (
                         <>
-                          <span className="h-1.5 w-1.5 rounded-full bg-zinc-500" /> drag me · tell me what happened
+                          <span className="h-1.5 w-1.5 rounded-full bg-zinc-500" /> drag me anywhere
                         </>
                       )}
                     </div>
@@ -181,15 +244,33 @@ export function FloatingChat() {
                 </button>
               </div>
 
+              {/* Mode toggle */}
+              <div className="flex gap-1 border-b border-white/10 p-2">
+                {(["wonder", "capture"] as Mode[]).map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => changeMode(m)}
+                    className={cn(
+                      "flex-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                      mode === m ? "bg-white/10 text-zinc-100" : "text-zinc-400 hover:text-zinc-200",
+                    )}
+                  >
+                    {m === "wonder" ? "🧠 Wonder" : "✦ Capture"}
+                  </button>
+                ))}
+              </div>
+
               {/* Messages */}
               <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
                 {messages.length === 0 && (
                   <div className="pt-2 text-center">
                     <p className="mx-auto max-w-[17rem] text-sm text-zinc-400">
-                      Tell me what happened in plain words — I&apos;ll file it with all the detail kept. Or ask about your data.
+                      {mode === "wonder"
+                        ? "Let's think together — I won't save anything unless you tap Save."
+                        : "Tell me what happened in plain words — I'll file it with all the detail kept."}
                     </p>
                     <div className="mt-4 flex flex-col gap-2">
-                      {SUGGESTIONS.map((s) => (
+                      {SUGGESTIONS[mode].map((s) => (
                         <button
                           key={s}
                           onClick={() => send(s)}
@@ -215,6 +296,8 @@ export function FloatingChat() {
                         {m.role === "ai" ? <Markdown>{m.text}</Markdown> : m.text}
                       </div>
                     </div>
+
+                    {/* Capture action cards */}
                     {m.role === "ai" && m.steps && (
                       <div className="mt-2 flex flex-col gap-1.5">
                         {m.steps
@@ -222,6 +305,23 @@ export function FloatingChat() {
                           .map((s, j) => (
                             <ActionCard key={j} step={s} onNavigate={() => setOpen(false)} />
                           ))}
+                      </div>
+                    )}
+
+                    {/* Wonder → save bridge */}
+                    {m.role === "ai" && m.mode === "wonder" && m.source === "ai" && (
+                      <div className="mt-2">
+                        {m.saved ? (
+                          <span className="text-[11px] text-emerald-300">✓ saved</span>
+                        ) : (
+                          <button
+                            onClick={() => saveThis(i)}
+                            disabled={loading}
+                            className="press rounded-full border border-violet-400/30 bg-violet-500/10 px-3 py-1 text-xs text-violet-200 hover:bg-violet-500/20 disabled:opacity-50"
+                          >
+                            ✦ Save this as an entry
+                          </button>
+                        )}
                       </div>
                     )}
                   </motion.div>
@@ -251,7 +351,7 @@ export function FloatingChat() {
                 <input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Tell me what to capture, or ask…"
+                  placeholder={mode === "wonder" ? "Think out loud…" : "Tell me what to capture, or ask…"}
                   className="flex-1 rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-violet-400/50 focus:outline-none"
                 />
                 <MicButton value={input} onChange={setInput} className="h-10 w-10 shrink-0" />
