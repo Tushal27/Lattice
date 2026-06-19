@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion, useDragControls, useMotionValue } from "motion/react";
+import { AnimatePresence, motion, useMotionValue } from "motion/react";
 import { Markdown } from "@/components/Markdown";
 import { MicButton } from "@/components/MicButton";
 import { TYPES, type EntryType } from "@/lib/types";
@@ -55,10 +55,11 @@ export function FloatingChat() {
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const constraintsRef = useRef<HTMLDivElement>(null);
-  const dragControls = useDragControls();
 
+  // Draggable launcher position, remembered across reloads.
   const fabX = useMotionValue(0);
   const fabY = useMotionValue(0);
+  const downRef = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     try {
@@ -73,6 +74,17 @@ export function FloatingChat() {
       if (savedMode === "wonder" || savedMode === "capture") setMode(savedMode);
     } catch {}
   }, [fabX, fabY]);
+
+  // Let nav entries open the chat directly (optionally in a given mode).
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const m = (e as CustomEvent).detail?.mode as Mode | undefined;
+      if (m === "wonder" || m === "capture") setMode(m);
+      setOpen(true);
+    };
+    window.addEventListener("lattice:open-chat", onOpen);
+    return () => window.removeEventListener("lattice:open-chat", onOpen);
+  }, []);
 
   function changeMode(m: Mode) {
     setMode(m);
@@ -132,7 +144,7 @@ export function FloatingChat() {
     }
   }
 
-  // The bridge: turn a Wonder conversation (up to message `index`) into a saved entry.
+  // Bridge: turn a Wonder conversation (up to message `index`) into a saved entry.
   async function saveThis(index: number) {
     if (loading) return;
     const history = messages.slice(0, index + 1).map((m) => ({ role: m.role, text: m.text }));
@@ -165,19 +177,25 @@ export function FloatingChat() {
 
   return (
     <>
-      <div ref={constraintsRef} className="pointer-events-none fixed inset-0 z-50">
-        {/* Draggable launcher — tap to open, drag to move anywhere. */}
+      {/* Draggable launcher in its own pointer-events-none bounds. */}
+      <div ref={constraintsRef} className="pointer-events-none fixed inset-0 z-40">
         <motion.button
           drag
           dragConstraints={constraintsRef}
           dragMomentum={false}
           dragElastic={0.05}
           onDragEnd={persistFab}
-          onTap={() => setOpen(true)}
+          onPointerDown={(e) => {
+            downRef.current = { x: e.clientX, y: e.clientY };
+          }}
+          onPointerUp={(e) => {
+            const d = downRef.current;
+            downRef.current = null;
+            if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 6) setOpen(true);
+          }}
           initial={false}
           animate={{ opacity: open ? 0 : 1, scale: open ? 0.6 : 1 }}
-          whileDrag={{ scale: 1.12 }}
-          whileTap={{ scale: 0.9 }}
+          whileTap={{ scale: 0.92 }}
           aria-label="Open AI agent (drag to move)"
           style={{ x: fabX, y: fabY, touchAction: "none", pointerEvents: open ? "none" : "auto" }}
           className="glow-violet absolute bottom-24 right-4 grid h-14 w-14 cursor-grab place-items-center rounded-full bg-gradient-to-br from-violet-500 via-violet-600 to-sky-600 text-2xl active:cursor-grabbing md:bottom-6 md:right-6"
@@ -185,36 +203,27 @@ export function FloatingChat() {
           <span className="absolute inset-0 animate-ping rounded-full bg-violet-500/30 [animation-duration:3s]" />
           <span className="relative">✦</span>
         </motion.button>
+      </div>
 
-        <AnimatePresence>
-          {open && (
-            <motion.div
-              drag
-              dragControls={dragControls}
-              dragListener={false}
-              dragMomentum={false}
-              dragConstraints={constraintsRef}
-              dragElastic={0.04}
-              initial={{ y: 40, opacity: 0, scale: 0.96 }}
-              animate={{ y: 0, opacity: 1, scale: 1 }}
-              exit={{ y: 40, opacity: 0, scale: 0.96 }}
-              transition={{ type: "spring", damping: 28, stiffness: 320 }}
-              className="glass pointer-events-auto absolute bottom-20 right-4 flex h-[68dvh] w-[92vw] max-w-[400px] flex-col overflow-hidden rounded-3xl shadow-2xl md:bottom-6 md:right-6 md:h-[560px]"
-            >
-              {/* Header (drag handle) */}
-              <div
-                onPointerDown={(e) => dragControls.start(e)}
-                style={{ touchAction: "none" }}
-                className="flex cursor-grab items-center justify-between border-b border-white/10 px-4 py-3 active:cursor-grabbing"
-              >
+      {/* Full-screen chat with a solid backdrop. */}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 16 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            className="fixed inset-0 z-[60] flex flex-col bg-zinc-950"
+          >
+            {/* Header */}
+            <div className="border-b border-white/10 pt-[max(0.5rem,env(safe-area-inset-top))]">
+              <div className="mx-auto flex w-full max-w-2xl items-center justify-between px-4 py-3">
                 <div className="flex items-center gap-3">
                   <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-violet-500 to-sky-500 text-lg">
                     ✦
                   </span>
                   <div>
-                    <div className="flex items-center gap-1.5 text-sm font-semibold text-zinc-100">
-                      Lattice Agent <span className="text-zinc-600">⠿</span>
-                    </div>
+                    <div className="text-sm font-semibold text-zinc-100">Lattice Agent</div>
                     <div className="flex items-center gap-1.5 text-[11px] text-zinc-400">
                       {lastAi ? (
                         lastAi.source === "ai" ? (
@@ -229,23 +238,21 @@ export function FloatingChat() {
                         )
                       ) : (
                         <>
-                          <span className="h-1.5 w-1.5 rounded-full bg-zinc-500" /> drag me anywhere
-                        </>
+                          <span className="h-1.5 w-1.5 rounded-full bg-zinc-500" /> ready</>
                       )}
                     </div>
                   </div>
                 </div>
                 <button
                   onClick={() => setOpen(false)}
-                  className="press grid h-8 w-8 place-items-center rounded-full text-zinc-400 hover:bg-white/10 hover:text-zinc-100"
+                  className="press grid h-9 w-9 place-items-center rounded-full text-zinc-400 hover:bg-white/10 hover:text-zinc-100"
                   aria-label="Close"
                 >
                   ✕
                 </button>
               </div>
-
               {/* Mode toggle */}
-              <div className="flex gap-1 border-b border-white/10 p-2">
+              <div className="mx-auto flex w-full max-w-2xl gap-1 px-4 pb-2">
                 {(["wonder", "capture"] as Mode[]).map((m) => (
                   <button
                     key={m}
@@ -259,17 +266,22 @@ export function FloatingChat() {
                   </button>
                 ))}
               </div>
+            </div>
 
-              {/* Messages */}
-              <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+            {/* Messages */}
+            <div ref={scrollRef} className="flex-1 overflow-y-auto">
+              <div className="mx-auto w-full max-w-2xl space-y-3 px-4 py-5">
                 {messages.length === 0 && (
-                  <div className="pt-2 text-center">
-                    <p className="mx-auto max-w-[17rem] text-sm text-zinc-400">
+                  <div className="pt-8 text-center">
+                    <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-violet-500/20 to-sky-500/20 text-2xl">
+                      {mode === "wonder" ? "🧠" : "✦"}
+                    </div>
+                    <p className="mx-auto max-w-sm text-sm text-zinc-400">
                       {mode === "wonder"
                         ? "Let's think together — I won't save anything unless you tap Save."
                         : "Tell me what happened in plain words — I'll file it with all the detail kept."}
                     </p>
-                    <div className="mt-4 flex flex-col gap-2">
+                    <div className="mx-auto mt-4 flex max-w-sm flex-col gap-2">
                       {SUGGESTIONS[mode].map((s) => (
                         <button
                           key={s}
@@ -297,7 +309,6 @@ export function FloatingChat() {
                       </div>
                     </div>
 
-                    {/* Capture action cards */}
                     {m.role === "ai" && m.steps && (
                       <div className="mt-2 flex flex-col gap-1.5">
                         {m.steps
@@ -308,7 +319,6 @@ export function FloatingChat() {
                       </div>
                     )}
 
-                    {/* Wonder → save bridge */}
                     {m.role === "ai" && m.mode === "wonder" && m.source === "ai" && (
                       <div className="mt-2">
                         {m.saved ? (
@@ -339,15 +349,17 @@ export function FloatingChat() {
                   </div>
                 )}
               </div>
+            </div>
 
-              {/* Composer */}
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  send(input);
-                }}
-                className="flex items-center gap-2 border-t border-white/10 px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
-              >
+            {/* Composer */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                send(input);
+              }}
+              className="border-t border-white/10"
+            >
+              <div className="mx-auto flex w-full max-w-2xl items-center gap-2 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                 <input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
@@ -363,11 +375,11 @@ export function FloatingChat() {
                 >
                   ↑
                 </button>
-              </form>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+              </div>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

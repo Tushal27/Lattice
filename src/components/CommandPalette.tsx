@@ -99,7 +99,16 @@ export function CommandPalette() {
     { id: "nav-review", label: "Daily Review", icon: "☀️", run: () => go("/review"), keywords: "resurface on this day" },
     { id: "nav-patterns", label: "Patterns", icon: "📊", run: () => go("/patterns"), keywords: "insights trends calibration" },
     { id: "nav-reflect", label: "Reflections", icon: "🔮", run: () => go("/reflect"), keywords: "weekly monthly" },
-    { id: "nav-companion", label: "Thinking Partner", icon: "🤝", run: () => go("/companion"), keywords: "ai chat" },
+    {
+      id: "nav-companion",
+      label: "Thinking Partner",
+      icon: "🧠",
+      run: () => {
+        close();
+        window.dispatchEvent(new CustomEvent("lattice:open-chat", { detail: { mode: "wonder" } }));
+      },
+      keywords: "ai chat wonder partner",
+    },
     { id: "nav-timeline", label: "Life Timeline", icon: "🧭", run: () => go("/timeline"), keywords: "history" },
   ];
 

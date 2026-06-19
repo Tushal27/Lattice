@@ -21,7 +21,6 @@ const discover = [
   { href: "/timeline", label: "Life Timeline", icon: "🧭" },
   { href: "/patterns", label: "Patterns", icon: "📊" },
   { href: "/reflect", label: "Reflections", icon: "🔮" },
-  { href: "/companion", label: "Thinking Partner", icon: "🤝" },
 ];
 
 function NavLink({ href, label, icon }: { href: string; label: string; icon: string }) {
@@ -87,6 +86,13 @@ export function Sidebar() {
         {discover.map((n) => (
           <NavLink key={n.href} {...n} />
         ))}
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent("lattice:open-chat", { detail: { mode: "wonder" } }))}
+          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-zinc-400 transition-colors hover:bg-zinc-800/40 hover:text-zinc-200"
+        >
+          <span className="w-5 text-center text-base leading-none">🧠</span>
+          <span>Thinking Partner</span>
+        </button>
       </nav>
 
       <div className="mt-4 px-3 text-[11px] text-zinc-600">Every lesson compounds.</div>

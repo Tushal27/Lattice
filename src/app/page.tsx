@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { EntryCard } from "@/components/EntryCard";
+import { OpenChatButton } from "@/components/OpenChatButton";
 import { StatGrid } from "@/components/StatGrid";
 import { decisionsAwaitingReview, getStats, listEntries } from "@/lib/entries";
 import { prisma } from "@/lib/db";
@@ -137,14 +138,14 @@ export default async function Home() {
           </div>
 
           <div className="rounded-2xl border border-violet-500/20 bg-gradient-to-b from-violet-500/10 to-transparent p-4">
-            <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-violet-200">🤝 Thinking partner</h3>
+            <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-violet-200">🧠 Thinking partner</h3>
             <p className="mb-3 text-xs text-violet-200/70">Find patterns and challenge your assumptions.</p>
-            <Link
-              href="/companion"
-              className="inline-block rounded-lg bg-violet-600/90 px-3 py-1.5 text-sm font-medium text-white hover:bg-violet-600"
+            <OpenChatButton
+              mode="wonder"
+              className="press inline-block rounded-lg bg-violet-600/90 px-3 py-1.5 text-sm font-medium text-white hover:bg-violet-600"
             >
               Start a conversation →
-            </Link>
+            </OpenChatButton>
           </div>
         </aside>
       </div>
