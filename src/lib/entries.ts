@@ -84,8 +84,20 @@ export function buildEntryInput(type: string, payload: Record<string, unknown>):
   return input;
 }
 
+const REVIEW_KEYS = ["reviewOutcome", "reviewVerdict", "reviewLearning", "wouldRepeat"];
+
+/** Stamp when a decision was first reviewed, preserving it across later edits. */
+function applyReviewStamp(input: EntryInput, existingReviewedAt?: string) {
+  if (input.type !== "decision") return;
+  const fields = (input.fields ??= {});
+  const reviewed = REVIEW_KEYS.some((k) => fields[k]);
+  if (!reviewed) return;
+  fields.reviewedAt = existingReviewedAt || fields.reviewedAt || new Date().toISOString();
+}
+
 export async function createEntry(input: EntryInput) {
   const tags = normalizeTags(input.tags);
+  applyReviewStamp(input);
   return prisma.entry.create({
     data: {
       type: input.type,
@@ -107,6 +119,8 @@ export async function createEntry(input: EntryInput) {
 
 export async function updateEntry(id: string, input: EntryInput) {
   const tags = normalizeTags(input.tags);
+  const existing = await prisma.entry.findUnique({ where: { id }, select: { fields: true } });
+  applyReviewStamp(input, parseFields(existing?.fields).reviewedAt);
   return prisma.$transaction(async (tx) => {
     await tx.entryTag.deleteMany({ where: { entryId: id } });
     return tx.entry.update({
@@ -284,7 +298,10 @@ export async function decisionsAwaitingReview(days = 30) {
     orderBy: { createdAt: "asc" },
     take: 20,
   });
-  return decisions.filter((d) => !parseFields(d.fields).reviewOutcome);
+  return decisions.filter((d) => {
+    const f = parseFields(d.fields);
+    return !f.reviewedAt && !f.reviewOutcome;
+  });
 }
 
 interface EntryColumns {

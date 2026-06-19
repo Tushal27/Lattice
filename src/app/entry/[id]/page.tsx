@@ -9,6 +9,19 @@ import { accent, cn, formatDate, parseFields, relativeTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
+function verdictStyle(v: string): string {
+  switch (v) {
+    case "Right call":
+      return "border-emerald-500/30 bg-emerald-500/10 text-emerald-300";
+    case "Wrong call":
+      return "border-rose-500/30 bg-rose-500/10 text-rose-300";
+    case "Mixed":
+      return "border-amber-500/30 bg-amber-500/10 text-amber-300";
+    default:
+      return "border-zinc-700 bg-zinc-800/60 text-zinc-300";
+  }
+}
+
 export default async function EntryPage(props: PageProps<"/entry/[id]">) {
   const { id } = await props.params;
   const entry = await getEntry(id);
@@ -19,10 +32,15 @@ export default async function EntryPage(props: PageProps<"/entry/[id]">) {
   const a = accent(cfg.accent);
 
   const values = entryToFormValues(entry, entry.type);
-  // Column-backed values (status, confidence, dates) already appear in the meta
-  // row, so the body shows only the rich, written-out fields.
-  const contentFields = cfg.fields.filter((f) => !f.column && !f.review && values[f.key]);
   const reviewFields = cfg.fields.filter((f) => f.review && values[f.key]);
+  const reviewed = entry.type === "decision" && reviewFields.length > 0;
+  const reviewedAt = parseFields(entry.fields).reviewedAt;
+  // Column-backed values (status, confidence, dates) already appear in the meta
+  // row, so the body shows only the rich, written-out fields. When a decision
+  // has been reviewed, `expected` moves into the Expected-vs-Actual block.
+  const contentFields = cfg.fields.filter(
+    (f) => !f.column && !f.review && values[f.key] && !(reviewed && f.key === "expected"),
+  );
   const needsReview =
     entry.type === "decision" && reviewFields.length === 0 && !parseFields(entry.fields).reviewOutcome;
 
@@ -107,23 +125,59 @@ export default async function EntryPage(props: PageProps<"/entry/[id]">) {
               {contentFields.map((f) => (
                 <div key={f.key}>
                   <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500">{f.label}</h3>
-                  <p className="whitespace-pre-wrap break-words text-zinc-200">{values[f.key]}</p>
+                  <p className="whitespace-pre-line break-words text-zinc-200">{values[f.key]}</p>
                 </div>
               ))}
             </div>
           )}
 
-          {reviewFields.length > 0 && (
+          {reviewed && (
             <Card className="mt-6 border-amber-500/20 bg-amber-500/5">
-              <h3 className="mb-3 text-sm font-semibold text-amber-200">Review</h3>
-              <div className="space-y-4">
-                {reviewFields.map((f) => (
-                  <div key={f.key}>
-                    <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-300/70">{f.label}</h4>
-                    <p className="whitespace-pre-wrap break-words text-zinc-200">{values[f.key]}</p>
-                  </div>
-                ))}
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold text-amber-200">Review</h3>
+                {reviewedAt && (
+                  <span className="text-xs text-amber-200/60">reviewed {relativeTime(reviewedAt)}</span>
+                )}
               </div>
+
+              {/* Verdict + would-repeat badges */}
+              {(values.reviewVerdict || values.wouldRepeat) && (
+                <div className="mb-4 flex flex-wrap gap-2">
+                  {values.reviewVerdict && (
+                    <span className={cn("rounded-full border px-2.5 py-1 text-xs font-medium", verdictStyle(values.reviewVerdict))}>
+                      {values.reviewVerdict}
+                    </span>
+                  )}
+                  {values.wouldRepeat && (
+                    <span className="rounded-full border border-zinc-700 bg-zinc-800/60 px-2.5 py-1 text-xs text-zinc-300">
+                      Repeat? {values.wouldRepeat}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Expected vs Actual */}
+              {(values.expected || values.reviewOutcome) && (
+                <div className="mb-4 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-3">
+                    <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500">Expected</h4>
+                    <p className="whitespace-pre-line break-words text-sm text-zinc-300">{values.expected || "—"}</p>
+                  </div>
+                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+                    <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-300/70">What actually happened</h4>
+                    <p className="whitespace-pre-line break-words text-sm text-zinc-200">{values.reviewOutcome || "—"}</p>
+                  </div>
+                </div>
+              )}
+
+              {values.reviewLearning && (
+                <div>
+                  <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-300/70">
+                    What you&apos;d do differently
+                  </h4>
+                  <p className="whitespace-pre-line break-words text-zinc-200">{values.reviewLearning}</p>
+                </div>
+              )}
             </Card>
           )}
 

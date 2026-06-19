@@ -54,6 +54,7 @@ const decision: TypeConfig = {
     { key: "details", label: "Details", kind: "textarea", placeholder: "The full story — nothing gets trimmed." },
     { key: "reviewOutcome", label: "What actually happened", kind: "textarea", review: true, placeholder: "Review later" },
     { key: "reviewVerdict", label: "Was it the right call?", kind: "select", review: true, options: ["", "Right call", "Mixed", "Wrong call", "Too early to tell"] },
+    { key: "wouldRepeat", label: "Would you decide the same again?", kind: "select", review: true, options: ["", "Yes", "No", "Not sure"] },
     { key: "reviewLearning", label: "What you'd do differently", kind: "textarea", review: true },
   ],
 };

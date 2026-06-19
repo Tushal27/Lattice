@@ -295,12 +295,12 @@ async function buildContext() {
 function typeSchema(): string {
   return TYPE_LIST.map((cfg) => {
     const fields = cfg.fields
-      .filter((f) => !f.review)
       .map((f) => {
-        if (f.kind === "select") return `${f.key}(one of: ${(f.options ?? []).filter(Boolean).join("|")})`;
-        if (f.kind === "number") return `${f.key}(number)`;
-        if (f.kind === "date") return `${f.key}(YYYY-MM-DD)`;
-        return f.key;
+        const tag = f.review ? " [review-only: set via update_entry when grading a past decision]" : "";
+        if (f.kind === "select") return `${f.key}(one of: ${(f.options ?? []).filter(Boolean).join("|")})${tag}`;
+        if (f.kind === "number") return `${f.key}(number)${tag}`;
+        if (f.kind === "date") return `${f.key}(YYYY-MM-DD)${tag}`;
+        return `${f.key}${tag}`;
       })
       .join(", ");
     return `- ${cfg.type}: ${fields}`;
@@ -361,7 +361,8 @@ const AGENT_SYSTEM = [
   "- You do NOT need to copy the user's entire message verbatim — the system automatically keeps their full original text in `details`. Focus on a great title, summary, type, and tags. For very long pastes, keep your JSON compact.",
   "- For a big dump (work log, brain dump), prefer creating ONE rich entry that keeps it all rather than several thin ones, unless the user clearly lists separate items.",
   "- Fill EVERY relevant field. Be generous and specific: a real title, a one-line summary, context/reasoning, 2-4 lowercase tags. Leave a field empty only if the user truly gave nothing for it (do not write 'none').",
-  "- For decisions, estimate a confidence (0-100) from how sure they sound.",
+  "- For decisions, estimate a confidence (0-100) from how sure they sound. Do NOT set review-only fields when first creating a decision.",
+  "- REVIEWING A DECISION: when the user grades how a past decision turned out (e.g. \"review my X decision\", \"that call worked out\", \"it was the wrong move\"), first search_entries to find its id, then update_entry with the review-only fields: reviewOutcome (what actually happened), reviewVerdict (Right call|Mixed|Wrong call|Too early to tell), wouldRepeat (Yes|No|Not sure), reviewLearning. Don't change the original decision text.",
   "- When the user is simply capturing a thought, create ONE entry and STOP — do not connect, search, or create extras. Set done=true.",
   "- Only connect_entries when the user explicitly asks to link things, and only with real ids from the context or a search result. NEVER invent ids or use a title as an id. If you don't have a real id, don't connect.",
   "- Do each write at most once. After your write actions, set done=true and give a short, friendly reply describing what you saved.",
