@@ -61,8 +61,8 @@ export default async function EntryPage(props: PageProps<"/entry/[id]">) {
                 <TypeBadge type={entry.type} />
                 <span className="text-xs text-zinc-500">added {relativeTime(entry.createdAt)}</span>
               </div>
-              <h1 className="text-2xl font-semibold leading-tight text-zinc-50">{entry.title}</h1>
-              {entry.summary && <p className="mt-2 text-zinc-400">{entry.summary}</p>}
+              <h1 className="break-words text-2xl font-semibold leading-tight text-zinc-50">{entry.title}</h1>
+              {entry.summary && <p className="mt-2 break-words text-zinc-400">{entry.summary}</p>}
             </div>
             <EntryToolbar id={entry.id} />
           </div>
@@ -107,7 +107,7 @@ export default async function EntryPage(props: PageProps<"/entry/[id]">) {
               {contentFields.map((f) => (
                 <div key={f.key}>
                   <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500">{f.label}</h3>
-                  <p className="whitespace-pre-wrap text-zinc-200">{values[f.key]}</p>
+                  <p className="whitespace-pre-wrap break-words text-zinc-200">{values[f.key]}</p>
                 </div>
               ))}
             </div>
@@ -120,7 +120,7 @@ export default async function EntryPage(props: PageProps<"/entry/[id]">) {
                 {reviewFields.map((f) => (
                   <div key={f.key}>
                     <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-300/70">{f.label}</h4>
-                    <p className="whitespace-pre-wrap text-zinc-200">{values[f.key]}</p>
+                    <p className="whitespace-pre-wrap break-words text-zinc-200">{values[f.key]}</p>
                   </div>
                 ))}
               </div>

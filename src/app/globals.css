@@ -13,6 +13,7 @@ html,
 body {
   background-color: #07070a;
   color: #e4e4e7;
+  overflow-x: hidden;
 }
 
 body {
@@ -186,6 +187,13 @@ body::after {
 }
 .prose-lattice h3 {
   font-size: 1rem;
+}
+.prose-lattice p,
+.prose-lattice li,
+.prose-lattice h1,
+.prose-lattice h2,
+.prose-lattice h3 {
+  overflow-wrap: anywhere;
 }
 .prose-lattice p {
   margin: 0.5rem 0;
