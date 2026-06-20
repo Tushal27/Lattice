@@ -3,38 +3,39 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 
-const SEEN_KEY = "lattice:guide-seen";
+// Bump the version to re-show the refreshed guide once after a feature update.
+const SEEN_KEY = "lattice:guide-seen-v2";
 
 const STEPS = [
   {
     icon: "🟣",
     title: "The one rule",
-    body: "Capture the moment it happens — don't organize. The AI files it, tags it, and connects it for you.",
+    body: "Capture the moment it happens — don't organize. The AI files it, tags it, and auto-connects it for you.",
   },
   {
-    icon: "🎤",
-    title: "Daily · Capture  (~2 min)",
-    body: "Tap the ✦ bubble → Capture and just say it (voice works great): “Decided to…”, “Learned that…”, “Aha — …”, “Question: …”. It picks the type, fills the fields, and adds tags.",
-  },
-  {
-    icon: "☀️",
-    title: "Morning · Review  (~1 min)",
-    body: "Open Review: judge a decision old enough to grade, revisit a resurfaced lesson, and see “on this day.” Adding how a decision turned out is what sharpens your judgment.",
-  },
-  {
-    icon: "🔮",
-    title: "Weekly · Reflect  (~5 min)",
-    body: "Reflections → This week. Read what the AI noticed — your best call, biggest risk, a pattern, an open question.",
+    icon: "✦",
+    title: "Capture, any way",
+    body: "Tap the ✦ bubble → Capture and just say it — type, dictate with 🎤, or 📷 photograph notes/whiteboards/screenshots. It reads it, picks the type, fills every field, and links related entries.",
   },
   {
     icon: "🧠",
-    title: "Anytime · Wonder",
-    body: "✦ → Wonder to think out loud — nothing is saved. Reach a conclusion worth keeping? Tap “✦ Save this as an entry.”",
+    title: "Wonder vs Capture",
+    body: "In the chat, switch to 🧠 Wonder to think out loud (nothing is saved) — reach something worth keeping and tap “✦ Save this.” Switch to ✦ Capture to just file things.",
   },
   {
-    icon: "📊",
-    title: "Monthly · Explore",
-    body: "Patterns and the Knowledge Graph show how you think — recurring themes, decision calibration, clusters of ideas. Pure payoff; nothing to maintain.",
+    icon: "☀️",
+    title: "Daily Review",
+    body: "Judge decisions old enough to grade (record the outcome → see Expected vs Actual), revisit a resurfaced lesson, and see “on this day.” This is what sharpens your judgment.",
+  },
+  {
+    icon: "🎯",
+    title: "Test Me",
+    body: "Active-recall flashcards on your own lessons & aha moments, so your insights actually stick. The app quizzes you with AI-written questions.",
+  },
+  {
+    icon: "🔮",
+    title: "Reflect & learn",
+    body: "Weekly Reflections coach you on what to review and connect. Patterns + AI Judgment show your calibration and what your good vs bad calls share. The Graph maps it all.",
   },
 ];
 

@@ -7,229 +7,194 @@ built. Skim the headings; dive where you need.
 
 ## 1. What Lattice is
 
-A **personal operating system / second brain**. Not a notes app or task manager —
-a place to capture *how you think* (decisions, lessons, breakthroughs, questions,
-projects) so your knowledge **compounds over years** instead of being forgotten.
+A **personal operating system / second brain**. Not a notes or task app — a place
+to capture *how you think* (decisions, lessons, breakthroughs, questions,
+projects) so your knowledge **compounds over years**. Everything you capture is
+an **Entry**; entries connect, get tagged, resurface over time, and an AI helps
+you capture, connect, reflect, and learn.
 
-Core idea: **everything you capture is an "Entry."** Entries connect to each
-other, get tagged, resurface over time, and an AI agent helps you capture,
-connect, and reflect.
+Mobile-first and installable (PWA). Local-first data (SQLite) that scales to a
+hosted database (Turso) with no code change.
 
 ---
 
 ## 2. The five areas (Entry types)
 
-| Area | Icon | Purpose | Key fields |
+| Area | Icon | Purpose | Notable fields |
 |---|---|---|---|
-| **Decisions** | ⚖️ | Record a choice now, judge it later | context, options, reasoning, expected outcome, **confidence 0–100**, date, + later **review** (what happened / verdict / learning) |
-| **Lessons** | 🎓 | Turn experience & mistakes into wisdom | category, what happened, root cause, the lesson, how to avoid repeating |
-| **Aha Moments** | 💡 | Capture breakthroughs | what triggered it, the realization |
-| **Curiosity Vault** (Questions) | ❓ | Never lose an interesting question | why it matters, status (open/exploring/answered), findings |
-| **Projects** | 🚀 | Efforts that accumulate a story | goal, status (active/paused/done), reflections; other entries attach to it |
+| **Decisions** | ⚖️ | Record a choice now, judge it later | context, options, reasoning, expected outcome, **confidence 0–100**, date, **Details**, + review: actual outcome, verdict, would-repeat, learning |
+| **Lessons** | 🎓 | Turn mistakes into wisdom | category, what happened, root cause, lesson, prevention, Details |
+| **Aha Moments** | 💡 | Capture breakthroughs | trigger, the realization, Details |
+| **Curiosity Vault** (Questions) | ❓ | Never lose a question | why it matters, status (open/exploring/answered), findings, Details |
+| **Projects** | 🚀 | Efforts that accumulate a story | goal, status, reflections, Details; other entries attach to them |
 
-All five share one underlying model — adding a field or a new area is a config
-change (`src/lib/types.ts`), not a rewrite.
-
----
-
-## 3. Every screen (and how to use it)
-
-### Dashboard (`/`)
-Your home. Greeting + hero, **animated stat cards** per area (tap to open),
-**Recent** entries, and a side rail with nudges: *Decisions ready to review*,
-*Open questions*, and a Thinking-Partner shortcut.
-
-### Capture (`/capture`, the ＋ button)
-Two ways to capture:
-1. **Quick Capture** — type or 🎤 speak a raw thought, tap **✨ Sort it for me**;
-   AI picks the area and pre-fills title/summary/tags. Tweak and save.
-2. **Pick an area** manually → a tailored form for that type.
-
-### Area lists (`/decisions`, `/lessons`, `/aha`, `/questions`, `/projects`)
-A grid of entry cards for that area, with a "New …" button.
-
-### Entry detail (`/entry/[id]`)
-Full view: all written fields, meta (confidence, status, date, parent project),
-tags, a **review banner** for decisions old enough to judge, child entries (for
-projects), and the **Connections panel** (existing links, suggested links, and
-**✦ Ask AI why** they relate). Toolbar: **Edit** / **Delete**.
-
-### Edit (`/entry/[id]/edit`)
-Same form, pre-filled, including the **review** fields for decisions.
-
-### Search (`/search`)
-One box to recall anything across every area (title, summary, fields, tags).
-
-### Life Timeline (`/timeline`)
-Everything in chronological order, grouped by month — see your evolution.
-
-### Daily Review (`/review`)
-- **Decisions ready to judge** (old enough to review)
-- **Worth remembering today** — older lessons/insights resurfaced on a daily rotation
-- **On this day** — what you were thinking about on this date before
-
-### Reflections (`/reflect`)
-AI-written **weekly / monthly** reflection: what you learned, best decision,
-biggest risk, a pattern, an open question. ↻ regenerate.
-
-### Patterns (`/patterns`)
-- Where your attention goes (area distribution)
-- **Decision calibration** (avg confidence + reviewed verdicts)
-- Recurring themes (tag cloud)
-- Emerging interests (last 30 days)
-- Your most-connected entries (hubs of thinking)
-
-### Knowledge Graph (`/graph`)
-Interactive force-directed map: nodes = entries (colored by type), edges =
-connections + project membership. Drag, pinch/zoom (or +/− buttons), hover to
-highlight a neighborhood, tap to open.
-
-### Thinking Partner (`/companion`)
-A full-page chat (the floating ✦ agent is the more capable everyday surface).
+Every type has a **Details** catch-all so nothing you write (or paste, or
+photograph) gets trimmed. The whole system is config-driven in
+`src/lib/types.ts` — one form and one detail view serve all areas.
 
 ---
 
-## 4. Global tools (available everywhere)
+## 3. Capturing (five ways)
 
-- **The Agent (✦, floating, bottom-right):** the star feature. Describe things
-  in plain words and it *acts* — creates fully-filled entries, connects/updates
-  them, answers questions about your data. Shows each action as a card with a
-  link; never deletes. Voice 🎤 supported.
-- **Command Palette (⌘K, or "Find" on mobile):** instant capture, search, and
-  navigation.
-- **Voice dictation (🎤):** tap-and-talk in the agent chat and Quick Capture.
-- **Toasts:** confirmation feedback for actions.
-- **Mobile-first chrome:** bottom tab bar + center capture button; installable
-  PWA (home-screen icon, offline for visited pages).
-
-See `README.md` → *Enabling AI* and below for the AI details.
+1. **The Agent (✦) — Capture mode:** say it in plain words and it files the
+   right entry, fully filled, preserving your full text. Then it **auto-links**
+   the new entry to related ones.
+2. **Quick Capture** (`/capture` → "✨ Sort it for me"): dump a raw thought, AI
+   picks the area + fills title/summary/tags; you tweak and save.
+3. **Manual**: pick an area for a tailored form.
+4. **Voice (🎤)**: tap-and-talk dictation in the chat and Quick Capture.
+5. **Snap & Capture (📷)**: photograph handwritten notes, a whiteboard, a
+   screenshot, or a book page — the **vision** AI reads it and files the entry.
+   Images are compressed on-device first to stay token-cheap.
 
 ---
 
-## 5. The AI (engine + features)
+## 4. The AI chat (✦) — two brains in one
 
-**Engine** (`src/lib/ai.ts`): one provider-agnostic layer with a **fallback
-chain**. Configure any keys; it tries them in order until one answers.
-- Providers: `custom → Groq → OpenRouter → Cerebras → Mistral → Together → Gemini`
-- Multiple keys per provider (comma-separated) to dodge rate limits
-- `AI_PROVIDER_ORDER` to reorder, `AI_PROVIDER` to pin one
-- **Your own model:** set `AI_BASE_URL` + `AI_API_KEY` + `AI_MODEL` → becomes primary
-- No keys → features fall back to local heuristics (app stays usable)
+A floating ✦ button (draggable; tap to open) opens a **full-screen** chat with a
+mode toggle:
 
-**AI-powered features:**
-1. **Agent** (`/api/agent`) — tool-using assistant: create/update/connect/search/
-   read entries via a bounded, delete-free loop and a provider-agnostic JSON
-   protocol.
-2. **Quick Capture classify** (`/api/ai` task `classify`) — raw thought → area +
-   fields. Heuristic fallback offline.
-3. **Reflections** (`task reflect`) — weekly/monthly summary. Templated fallback.
-4. **Connection insight** (`task connect`) — why suggested entries relate.
-   Tag/keyword suggestions work without AI.
-5. **Voice → text** — browser Web Speech API (on-device, free).
+- **🧠 Wonder** — the thinking partner. Conversational, remembers the thread,
+  draws on your entries, and **never auto-saves**. When a conversation reaches
+  something worth keeping, tap **"✦ Save this as an entry."**
+- **✦ Capture** — the agent. Say it → it files it instantly (create / update /
+  connect), shows **action cards** with open links, and updates your data live.
+  Never deletes.
 
-**Privacy:** context is sent to whichever provider you configure (over HTTPS).
-With no keys, nothing leaves the app. The custom-roster option keeps data on
-your own infra.
+Both modes accept **voice** and **images**, and the header shows the live
+provider (e.g. "connected · custom"). Input is a paste-friendly auto-growing box
+(Enter sends on desktop; on phones Enter = newline, ↑ sends).
 
 ---
 
-## 6. Architecture
+## 5. Decision Review (improve your judgment)
 
-- **Framework:** Next.js 16 (App Router, React 19, TypeScript), Turbopack.
-- **Styling:** Tailwind CSS v4 + `motion` for animation. Dark, glass, aurora.
-- **DB:** SQLite via **Prisma 7** + the **libSQL** driver adapter. Same code for
-  a local file (`dev.db`) and hosted **Turso** in production — switched by env.
-- **PWA:** web manifest + service worker (`public/sw.js`) + icons; offline
-  fallback page; standalone display.
-- **Auto-migration:** `src/instrumentation.ts` runs `ensureSchema()` once at
-  server start, creating tables if missing — so a fresh/empty production DB just
-  works (no migration step needed to deploy).
-
-**Data model (`prisma/schema.prisma`):**
-- `Entry` — `id, type, title, summary, status, confidence, fields (JSON),
-  occurredAt, createdAt, updatedAt, projectId (self-relation)`
-- `Tag` + `EntryTag` (many-to-many)
-- `Connection` — undirected link between two entries (`fromId, toId, note`)
-
-**How data flows:**
-- **Reads:** Server Components call helpers in `src/lib/entries.ts` (Prisma)
-  directly. Pages are `dynamic` so they're always fresh.
-- **Writes:** client components call **API route handlers**
-  (`/api/entries`, `/api/connections`, `/api/agent`, `/api/ai`, `/api/search`),
-  then `router.refresh()` to re-render server data.
-- **Config-driven UI:** `src/lib/types.ts` describes each area's fields; one
-  form (`EntryForm`) and one detail renderer handle all types.
+- Decisions become **"ready to judge" after 14 days** (Daily Review + dashboard).
+- Record the **actual outcome**, a **verdict** (Right call / Mixed / Wrong call /
+  Too early), **would you decide the same again?**, and what you'd do
+  differently. A **reviewedAt** timestamp is stamped automatically.
+- The entry shows **Expected vs Actual** side-by-side with a colored verdict
+  badge.
+- You can review by voice/text too: *"review my X decision — it worked out,
+  right call, I'd do it again."*
+- **AI Judgment analysis** (Patterns) studies your reviewed decisions for
+  **confidence calibration** and what your right vs wrong calls have in common.
 
 ---
 
-## 7. Project structure
+## 6. Every screen
 
+- **Dashboard (`/`)** — greeting, animated area stats, recent entries, nudges
+  (decisions to review, open questions, thinking-partner shortcut).
+- **Capture (＋)** — Quick Capture + manual area picker.
+- **Area lists** — `/decisions`, `/lessons`, `/aha`, `/questions`, `/projects`.
+- **Entry detail (`/entry/[id]`)** — fields, meta, tags, review card
+  (Expected/Actual), project children, and the **Connections** panel (existing +
+  suggested + "✦ Ask AI why"). Edit / Delete.
+- **Test Me (`/learn`)** — active-recall flashcards on your lessons & aha
+  moments; AI-written recall questions, Reveal, rate Got it / Fuzzy.
+- **Daily Review (`/review`)** — decisions ready to judge, resurfaced
+  lessons/insights, and "on this day."
+- **Reflections (`/reflect`)** — proactive weekly/monthly coach: takeaways,
+  patterns, *which decisions to review*, *which entries to connect*.
+- **Patterns (`/patterns`)** — attention distribution, decision calibration,
+  recurring themes, emerging interests, most-connected hubs, + **AI Judgment**.
+- **Knowledge Graph (`/graph`)** — interactive force-directed map; auto-builds as
+  you capture (auto-connect). Drag, zoom, tap.
+- **Life Timeline (`/timeline`)** — chronological evolution.
+- **Search (`/search`)** — recall anything across every area.
+- **How to use (?)** — the onboarding guide (auto-shows once on first launch).
+
+---
+
+## 7. Cross-cutting
+
+- **⌘K / "Find" palette** — capture, search, jump anywhere.
+- **Auto-connect on capture** — new entries link to tag-related ones, so the
+  graph builds itself.
+- **Knowledge connections** — manual links, tag/keyword suggestions, and an
+  AI "why these relate" insight.
+- **Toasts** for action feedback. **PWA**: installable, offline for visited
+  pages. **Mobile-first**: bottom tab bar + central capture button.
+
+---
+
+## 8. The AI engine
+
+Provider-agnostic with an automatic **fallback chain** — set any keys; it tries
+them in order until one answers (rate-limited/down providers fall through):
+
+`custom (your roster) → Groq → OpenRouter → Cerebras → Mistral → Together → Gemini`
+
+- **Your roster:** `AI_BASE_URL` (ends in `/v1`) + `AI_API_KEY` + `AI_MODEL`
+  (optional, defaults to `auto`). Becomes the primary engine; **vision-capable**.
+- **Multiple keys per provider** (comma-separated) to dodge per-key limits.
+- `AI_PROVIDER_ORDER` to reorder, `AI_PROVIDER` to pin one.
+- **Vision:** images sent as OpenAI `image_url` parts / Gemini `inline_data`,
+  compressed client-side, with longer timeouts.
+- **Robust tool JSON** via `jsonrepair` so agent actions parse reliably.
+- AI tasks: `ask`, `reflect`, `connect`, `classify`, `judgment`, `quiz`, plus the
+  tool-using `agent` endpoint.
+- No keys → every feature falls back to local heuristics; app stays usable.
+
+---
+
+## 9. Architecture & data
+
+- **Framework:** Next.js 16 (App Router, React 19, TS), Tailwind v4, `motion`.
+- **DB:** Prisma 7 + **libSQL** adapter — a local SQLite file (`dev.db`) in dev,
+  hosted **Turso** in prod, switched by env. Schema **auto-creates on first boot**
+  (`src/instrumentation.ts` → `ensureSchema`), so an empty prod DB just works.
+- **Data model:** `Entry` (type, title, summary, status, confidence,
+  `fields` JSON [type-specific + Details + review fields + reviewedAt],
+  occurredAt, timestamps, projectId self-relation); `Tag`/`EntryTag`;
+  `Connection` (undirected).
+- **Flow:** Server Components read via `src/lib/entries.ts` (Prisma) directly;
+  client mutations hit **API route handlers** then refresh / update optimistically.
+
+### Key files
 ```
-src/
-  app/
-    page.tsx              dashboard
-    capture/              quick capture + manual picker
-    decisions|lessons|aha|questions|projects/   area lists
-    entry/[id]/           detail + /edit
-    search/ timeline/ review/ reflect/ patterns/ graph/ companion/
-    offline/              PWA offline fallback
-    layout.tsx template.tsx loading.tsx not-found.tsx
-    manifest.ts icon.svg
-    api/
-      entries/ entries/[id]/ connections/ search/   CRUD
-      ai/        reflect | connect | ask | classify
-      agent/     the tool-using agent
-  components/             Sidebar, MobileNav, CommandPalette, FloatingChat,
-                         MicButton, EntryForm, EntryCard, QuickCapture,
-                         StatGrid, GraphCanvas, Toast, Markdown, ui, entry/*
-  lib/
-    types.ts     area/field config (drives forms + detail)
-    entries.ts   data access, tags, search, suggestions, stats, resurfacing
-    ai.ts        provider engine + fallback chain
-    agent.ts     agentic tool loop
-    companion.ts AI orchestration (reflect/connect/classify/ask)
-    db.ts        Prisma client + libSQL adapter
-    ensureSchema.ts  idempotent table creation
-    utils.ts     formatting, accents, helpers
-  instrumentation.ts      runs ensureSchema on boot
-prisma/          schema, migrations, seed
-scripts/         migrate-turso.mjs
-public/          icons + sw.js
+src/lib/types.ts        area + field config (drives forms, detail, agent schema)
+src/lib/entries.ts      data access, tags, search, suggestions, auto-link, review
+src/lib/ai.ts           provider engine, fallback chain, vision
+src/lib/agent.ts        tool-using agent loop
+src/lib/companion.ts    reflect / connect / classify / judgment / quiz / ask
+src/lib/image.ts        client-side image compression
+src/lib/db.ts           Prisma client + libSQL adapter
+src/instrumentation.ts  auto-creates schema on boot
+src/components/FloatingChat.tsx   the ✦ chat (modes, voice, photo, drag)
+src/app/api/{agent,ai,entries,connections,search}/   route handlers
 ```
 
 ---
 
-## 8. Running & deploying
+## 10. Run & deploy
 
-**Local:**
+**Local**
 ```bash
-npm install        # also runs prisma generate
+npm install        # generates Prisma client
 npm run db:setup   # create dev.db
 npm run db:seed    # sample data (optional)
-npm run dev        # http://localhost:3000
+npm run dev
 ```
 
-**Deploy (phone-friendly):**
-1. Create a free **Turso** DB (turso.tech) → copy URL + create a token.
-2. **Vercel** → import the repo → set env vars:
-   `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, and an AI key
-   (`GROQ_API_KEY` recommended). → Deploy.
+**Deploy (phone-friendly)**
+1. Create a free **Turso** DB; copy the URL + a token.
+2. **Vercel** → import repo → set `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, and
+   an AI key (your roster: `AI_BASE_URL` + `AI_API_KEY` [+ `AI_MODEL`], or
+   `GROQ_API_KEY`, etc.) → Deploy. Schema auto-creates; pushes to `main`
+   auto-redeploy.
 3. Open the URL on your phone → **Add to Home Screen**.
-Schema is created automatically on first boot. Every push to `main` redeploys.
 
 **Scripts:** `dev`, `build`, `start`, `lint`, `db:setup`, `db:seed`,
-`db:reset`, `db:turso` (apply schema to Turso), `postinstall` (prisma generate).
+`db:reset`, `db:turso`.
 
 ---
 
-## 9. A typical day with Lattice
+## 11. A day with Lattice
 
-1. **Capture in the moment** — tap ✦, speak or type: *"decided to … , confident,
-   tag …"*; the agent files it.
-2. **Morning: Daily Review** — judge a ripe decision, revisit a resurfaced lesson.
-3. **Connect** — on an entry, link related ideas (or let the agent do it).
-4. **Weekly: Reflect** — read the AI reflection; note patterns.
-5. **Explore** — Graph and Patterns show how your thinking is shaped.
-6. **Search** — recall anything, anytime.
-
-The point: every lesson, decision, and question becomes more valuable over time.
+Capture in the moment (type / speak / **snap a photo**) → it auto-connects →
+**Daily Review** grades old decisions and resurfaces lessons → **Test Me** drills
+your insights → **Reflections** coach your week → **Patterns / Judgment** show how
+your thinking is improving → **Search / Graph** recall and explore. Every entry
+gets more valuable over time.
