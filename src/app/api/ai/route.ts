@@ -1,4 +1,4 @@
-import { askPartner, classifyThought, connectionInsight, reflection } from "@/lib/companion";
+import { askPartner, classifyThought, connectionInsight, judgment, reflection } from "@/lib/companion";
 
 export async function POST(request: Request) {
   let body: Record<string, unknown>;
@@ -32,6 +32,8 @@ export async function POST(request: Request) {
       if (!text) return Response.json({ error: "text required" }, { status: 400 });
       return Response.json(await classifyThought(text));
     }
+    case "judgment":
+      return Response.json(await judgment());
     default:
       return Response.json({ error: "Unknown task" }, { status: 400 });
   }

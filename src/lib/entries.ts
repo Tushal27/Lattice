@@ -219,6 +219,47 @@ export async function removeConnection(id: string) {
 }
 
 /**
+ * Automatically links a (usually freshly created) entry to existing entries that
+ * share tags — so the knowledge graph builds itself on capture. Conservative:
+ * only links on real tag overlap, capped, skipping already-connected entries.
+ */
+export async function autoLinkByTags(entryId: string, max = 2) {
+  const entry = await prisma.entry.findUnique({
+    where: { id: entryId },
+    include: { tags: { include: { tag: true } }, connectionsFrom: true, connectionsTo: true },
+  });
+  if (!entry) return [];
+  const tagNames = entry.tags.map((t) => t.tag.name);
+  if (tagNames.length === 0) return [];
+
+  const connected = new Set<string>([
+    entryId,
+    ...entry.connectionsFrom.flatMap((c) => [c.fromId, c.toId]),
+    ...entry.connectionsTo.flatMap((c) => [c.fromId, c.toId]),
+  ]);
+
+  const candidates = await prisma.entry.findMany({
+    where: { tags: { some: { tag: { name: { in: tagNames } } } } },
+    include: { tags: { include: { tag: true } } },
+    take: 50,
+  });
+
+  const scored = candidates
+    .filter((c) => !connected.has(c.id))
+    .map((c) => ({ entry: c, shared: c.tags.filter((t) => tagNames.includes(t.tag.name)).length }))
+    .filter((s) => s.shared >= 1)
+    .sort((a, b) => b.shared - a.shared)
+    .slice(0, max);
+
+  const linked: { id: string; title: string; type: string }[] = [];
+  for (const s of scored) {
+    await addConnection(entryId, s.entry.id, "auto-linked by shared tags");
+    linked.push({ id: s.entry.id, title: s.entry.title, type: s.entry.type });
+  }
+  return linked;
+}
+
+/**
  * Local, no-AI heuristic: suggest entries that share tags or notable words with
  * the given entry and aren't already connected. Powers the "you might connect
  * this to…" hints even when Gemini is disabled.

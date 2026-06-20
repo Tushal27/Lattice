@@ -1,6 +1,12 @@
 import { jsonrepair } from "jsonrepair";
 import { generate, generateDetailed, THINKING_PARTNER_SYSTEM } from "@/lib/ai";
-import { entriesInRange, getEntry, listEntries, suggestConnections } from "@/lib/entries";
+import {
+  decisionsAwaitingReview,
+  entriesInRange,
+  getEntry,
+  listEntries,
+  suggestConnections,
+} from "@/lib/entries";
 import { TYPES } from "@/lib/types";
 import { parseFields } from "@/lib/utils";
 
@@ -38,7 +44,11 @@ export function rangeFor(period: "week" | "month"): { start: Date; end: Date; la
 
 export async function reflection(period: "week" | "month"): Promise<SourcedText & { count: number }> {
   const { start, end, label } = rangeFor(period);
-  const entries = await entriesInRange(start, end);
+  const [entries, dueDecisions, recent] = await Promise.all([
+    entriesInRange(start, end),
+    decisionsAwaitingReview(14),
+    listEntries({ limit: 150 }),
+  ]);
 
   if (entries.length === 0) {
     return {
@@ -48,21 +58,30 @@ export async function reflection(period: "week" | "month"): Promise<SourcedText 
     };
   }
 
+  const openQuestions = recent.filter((e) => e.type === "question" && e.status === "open");
+
   const prompt = [
     `Here is everything I captured in Lattice over ${label}:`,
     "",
     digest(entries),
+    dueDecisions.length
+      ? `\nDecisions now old enough to review (I haven't graded them yet):\n${digest(dueDecisions)}`
+      : "",
+    openQuestions.length ? `\nMy open questions:\n${digest(openQuestions)}` : "",
     "",
-    "Reflect with me. In short sections, cover:",
-    "1. What I seem to have learned",
-    "2. My best decision or insight",
-    "3. The biggest mistake or risk",
-    "4. A pattern you notice across these entries",
-    "5. One open question worth sitting with",
-    "Keep it tight and personal. Use markdown headings.",
-  ].join("\n");
+    "Be my proactive weekly coach. In short markdown sections, cover:",
+    "1. **What I learned** — the real takeaways",
+    "2. **Best decision / insight** and **biggest risk or mistake**",
+    "3. **Patterns** you notice across these entries (themes, repeated mistakes, emerging interests)",
+    "4. **Review now** — name the specific decisions above I should go grade, and why",
+    "5. **Connect these** — 1-2 specific pairs of my entries worth linking, and the insight that emerges",
+    "6. **One question** worth sitting with this week",
+    "Be specific and reference my actual entries by title. Tight and personal.",
+  ]
+    .filter(Boolean)
+    .join("\n");
 
-  const ai = await generate(prompt, { system: THINKING_PARTNER_SYSTEM, temperature: 0.8 });
+  const ai = await generate(prompt, { system: THINKING_PARTNER_SYSTEM, temperature: 0.75 });
   if (ai) return { source: "ai", count: entries.length, text: ai };
 
   return { source: "local", count: entries.length, text: localReflection(entries, label) };
@@ -85,6 +104,55 @@ function localReflection(entries: EntryLike[], label: string): string {
   }
   lines.push("", "_Connect an AI key (GROQ_API_KEY, OPENROUTER_API_KEY, or GEMINI_API_KEY) for a deeper, AI-written reflection._");
   return lines.join("\n");
+}
+
+/**
+ * Analyzes the user's reviewed decisions to improve their judgment over time:
+ * confidence calibration + what's common to right vs wrong calls + advice.
+ */
+export async function judgment(): Promise<SourcedText & { reviewedCount: number }> {
+  const decisions = await listEntries({ type: "decision", limit: 300 });
+  const reviewed = decisions
+    .map((d) => ({ d, f: parseFields(d.fields) }))
+    .filter((x) => x.f.reviewVerdict || x.f.reviewOutcome);
+
+  if (reviewed.length < 3) {
+    return {
+      source: "local",
+      reviewedCount: reviewed.length,
+      text: `Review at least 3 decisions to unlock judgment analysis — you have ${reviewed.length} so far. Grade a few old calls (Review → "Decisions ready to judge") and I'll spot how well-calibrated you are.`,
+    };
+  }
+
+  const rows = reviewed
+    .map(({ d, f }) => {
+      const conf = d.confidence != null ? `${d.confidence}%` : "—";
+      const tags = (d.tags ?? []).map((t) => t.tag.name).join(",");
+      return `- "${d.title}" | confidence ${conf} | verdict: ${f.reviewVerdict ?? "?"} | wouldRepeat: ${f.wouldRepeat ?? "?"} | expected: ${f.expected ?? "—"} | actual: ${f.reviewOutcome ?? "—"}${tags ? ` | tags: ${tags}` : ""}`;
+    })
+    .join("\n");
+
+  const prompt = [
+    "These are my reviewed decisions — what I predicted, how confident I was, and how they actually turned out:",
+    "",
+    rows,
+    "",
+    "Analyze my decision-making judgment. In short markdown sections:",
+    "1. **Calibration** — is my confidence well-matched to outcomes? Am I over- or under-confident? Use the numbers.",
+    "2. **My good calls have in common…** — patterns across decisions that went right (themes, tags, situations).",
+    "3. **My bad calls have in common…** — patterns across decisions that went wrong.",
+    "4. **Decide better** — 2 concrete, specific things I should do differently next time.",
+    "Reference my actual decisions. Be honest and specific, not generic.",
+  ].join("\n");
+
+  const ai = await generate(prompt, { system: THINKING_PARTNER_SYSTEM, temperature: 0.6 });
+  if (ai) return { source: "ai", reviewedCount: reviewed.length, text: ai };
+
+  return {
+    source: "local",
+    reviewedCount: reviewed.length,
+    text: "Add an AI key to analyze your judgment. Meanwhile, the Patterns page shows your verdict breakdown and average confidence.",
+  };
 }
 
 export async function connectionInsight(entryId: string) {
@@ -205,7 +273,7 @@ export async function askPartner(
   message: string,
   history: { role: string; text: string }[] = [],
 ): Promise<SourcedText & { provider?: string }> {
-  const recent = await listEntries({ limit: 40 });
+  const recent = await listEntries({ limit: 150 });
   const convo = history
     .slice(-10)
     .map((t) => `${t.role === "you" ? "Me" : "You"}: ${t.text}`)

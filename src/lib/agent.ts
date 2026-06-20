@@ -10,6 +10,7 @@ import { aiEnabled, generateDetailed } from "@/lib/ai";
 import { jsonrepair } from "jsonrepair";
 import {
   addConnection,
+  autoLinkByTags,
   buildEntryInput,
   createEntry,
   entryToFormValues,
@@ -118,6 +119,16 @@ export async function runAgent(
     // Once anything has been written, stop — prevents duplicate creates and
     // retry loops on a failed connect.
     if (didWrite || parsed.done || parsed.actions.length === 0) break;
+  }
+
+  // Auto-connect freshly created entries to related ones (the graph builds
+  // itself). Conservative: only on real tag overlap.
+  const created = steps.filter((s) => s.tool === "create_entry" && s.ok && s.entryId);
+  for (const c of created) {
+    const linked = await autoLinkByTags(c.entryId!, 2);
+    for (const e of linked) {
+      steps.push({ tool: "connect_entries", ok: true, summary: `Auto-linked to “${e.title}”` });
+    }
   }
 
   return {
@@ -285,7 +296,7 @@ async function recentTool(args: Record<string, unknown>): Promise<ExecutedStep> 
 // ---- prompt construction ---------------------------------------------------
 
 async function buildContext() {
-  const [recent, projects] = await Promise.all([listEntries({ limit: 20 }), listProjects()]);
+  const [recent, projects] = await Promise.all([listEntries({ limit: 60 }), listProjects()]);
   const recentText = recent.map((e) => `${e.id} · ${e.type} · ${e.title}`).join("\n");
   const projectText = projects.map((p) => `${p.id} · ${p.title}`).join("\n");
   const today = new Date().toISOString().slice(0, 10);

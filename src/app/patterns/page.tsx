@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { JudgmentCard } from "@/components/JudgmentCard";
 import { Card, EmptyState, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { TYPE_LIST, TYPES } from "@/lib/types";
@@ -81,6 +82,8 @@ export default async function PatternsPage() {
   return (
     <div className="animate-[fadeUp_0.4s_ease-out] space-y-6">
       <PageHeader icon="📊" accentColor="sky" title="Patterns" subtitle="How you think, learn, and decide — seen from above." />
+
+      <JudgmentCard />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Area distribution */}
