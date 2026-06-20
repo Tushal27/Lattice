@@ -197,8 +197,8 @@ export function GraphCanvas({ nodes, edges }: { nodes: GraphNode[]; edges: Graph
   const hoverNeighbors = hover ? neighbors.get(hover) : null;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-zinc-800/80 bg-zinc-950/40">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-zinc-800/80 px-4 py-2 text-xs text-zinc-500">
+    <div className="elev overflow-hidden rounded-2xl border border-white/8 bg-zinc-950/40">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-white/8 px-4 py-2.5 text-xs text-zinc-500">
         {TYPE_LIST.map((t) => (
           <span key={t.type} className="flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-full" style={{ background: COLORS[t.type] }} />
@@ -208,14 +208,14 @@ export function GraphCanvas({ nodes, edges }: { nodes: GraphNode[]; edges: Graph
         <div className="ml-auto flex items-center gap-1.5">
           <button
             onClick={() => setView((v) => ({ ...v, k: Math.max(0.35, v.k * 0.85) }))}
-            className="grid h-7 w-7 place-items-center rounded border border-zinc-700 text-base leading-none hover:text-zinc-300"
+            className="press grid h-7 w-7 place-items-center rounded-lg border border-white/10 bg-white/5 text-base leading-none text-zinc-400 hover:text-zinc-100"
             aria-label="Zoom out"
           >
             −
           </button>
           <button
             onClick={() => setView((v) => ({ ...v, k: Math.min(3, v.k * 1.18) }))}
-            className="grid h-7 w-7 place-items-center rounded border border-zinc-700 text-base leading-none hover:text-zinc-300"
+            className="press grid h-7 w-7 place-items-center rounded-lg border border-white/10 bg-white/5 text-base leading-none text-zinc-400 hover:text-zinc-100"
             aria-label="Zoom in"
           >
             +
@@ -225,7 +225,7 @@ export function GraphCanvas({ nodes, edges }: { nodes: GraphNode[]; edges: Graph
               setView({ x: 0, y: 0, k: 1 });
               reheat();
             }}
-            className="rounded border border-zinc-700 px-2 py-1 hover:text-zinc-300"
+            className="press rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-zinc-400 hover:text-zinc-100"
           >
             reset
           </button>

@@ -44,6 +44,14 @@ export async function AreaView({ type }: { type: EntryType }) {
           icon={cfg.icon}
           title={`No ${cfg.plural.toLowerCase()} yet`}
           hint={cfg.intro}
+          action={
+            <Link
+              href={`/capture?type=${type}`}
+              className={cn("press rounded-xl border px-4 py-2.5 text-sm font-medium hover:brightness-125", a.bg, a.border, a.text)}
+            >
+              ＋ New {cfg.label}
+            </Link>
+          }
         />
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

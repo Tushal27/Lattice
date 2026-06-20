@@ -71,12 +71,28 @@ export function PageHeader({
   );
 }
 
-export function EmptyState({ icon, title, hint }: { icon: string; title: string; hint?: string }) {
+export function EmptyState({
+  icon,
+  title,
+  hint,
+  action,
+}: {
+  icon: string;
+  title: string;
+  hint?: string;
+  action?: React.ReactNode;
+}) {
   return (
-    <div className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-900/30 px-6 py-14 text-center">
-      <div className="mb-3 text-4xl opacity-60">{icon}</div>
-      <p className="text-zinc-300">{title}</p>
-      {hint && <p className="mt-1 text-sm text-zinc-500">{hint}</p>}
+    <div className="ring-gradient relative overflow-hidden rounded-3xl border border-white/8 bg-white/[0.02] px-6 py-16 text-center">
+      <div className="pointer-events-none absolute -top-10 left-1/2 h-40 w-40 -translate-x-1/2 rounded-full bg-violet-600/10 blur-3xl" />
+      <div className="relative">
+        <div className="mx-auto mb-4 grid h-16 w-16 animate-[pop_0.4s_ease-out] place-items-center rounded-2xl border border-white/10 bg-white/[0.04] text-3xl">
+          {icon}
+        </div>
+        <p className="text-base font-medium text-zinc-200">{title}</p>
+        {hint && <p className="mx-auto mt-1.5 max-w-sm text-sm leading-relaxed text-zinc-500">{hint}</p>}
+        {action && <div className="mt-5 flex justify-center">{action}</div>}
+      </div>
     </div>
   );
 }

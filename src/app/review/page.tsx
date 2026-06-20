@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { EntryCard } from "@/components/EntryCard";
-import { PageHeader, TypeBadge } from "@/components/ui";
+import { EmptyState, PageHeader, TypeBadge } from "@/components/ui";
 import { decisionsAwaitingReview, onThisDay, resurface } from "@/lib/entries";
 import { groupedCommitments } from "@/lib/commitments";
 import { relativeTime } from "@/lib/utils";
@@ -32,15 +32,19 @@ export default async function ReviewPage() {
       />
 
       {nothing && (
-        <div className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-900/30 p-10 text-center">
-          <p className="text-zinc-300">Nothing to resurface yet.</p>
-          <p className="mt-1 text-sm text-zinc-500">
-            As your entries age, this page brings the right ones back at the right time.
-          </p>
-          <Link href="/capture" className="mt-3 inline-block text-sm font-medium text-violet-300 hover:underline">
-            Capture something →
-          </Link>
-        </div>
+        <EmptyState
+          icon="☀️"
+          title="Nothing to resurface yet"
+          hint="As your entries age, this page brings the right ones back at the right time — old decisions to judge, buried lessons to revisit."
+          action={
+            <Link
+              href="/capture"
+              className="press glow-violet rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 px-4 py-2.5 text-sm font-medium text-white"
+            >
+              ＋ Capture something
+            </Link>
+          }
+        />
       )}
 
       {dueCommitments.length > 0 && (
