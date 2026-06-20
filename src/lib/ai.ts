@@ -28,13 +28,14 @@ interface ProviderSpec {
 // Most providers speak the OpenAI chat-completions format, so they share a path.
 const REGISTRY: ProviderSpec[] = [
   // Your own / self-hosted OpenAI-compatible endpoint. Set AI_BASE_URL +
-  // AI_API_KEY (+ AI_MODEL) and it becomes the primary engine.
+  // AI_API_KEY (+ optional AI_MODEL) and it becomes the primary engine.
+  // Defaults to "auto" for rosters/routers that pick the model themselves.
   {
     name: "custom",
     kind: "openai",
     keyEnv: "AI_API_KEY",
     modelEnv: "AI_MODEL",
-    defaultModel: "default",
+    defaultModel: "auto",
     url: "", // resolved at runtime from AI_BASE_URL
   },
   {
