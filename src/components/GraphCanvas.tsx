@@ -12,7 +12,7 @@ export interface GraphNode {
 export interface GraphEdge {
   source: string;
   target: string;
-  kind: "connection" | "project";
+  kind: "connection" | "project" | "commitment";
 }
 
 const COLORS: Record<string, string> = {
@@ -21,6 +21,7 @@ const COLORS: Record<string, string> = {
   aha: "#e879f9",
   question: "#38bdf8",
   project: "#a78bfa",
+  commitment: "#2dd4bf",
 };
 
 const W = 1000;
@@ -116,7 +117,7 @@ export function GraphCanvas({ nodes, edges }: { nodes: GraphNode[]; edges: Graph
           const dx = p.x[t] - p.x[s];
           const dy = p.y[t] - p.y[s];
           const d = Math.sqrt(dx * dx + dy * dy) || 0.01;
-          const target = e.kind === "project" ? 90 : 130;
+          const target = e.kind === "connection" ? 130 : 90;
           const fk = ((d - target) / d) * 0.05 * a;
           p.vx[s] += dx * fk;
           p.vy[s] += dy * fk;
@@ -251,7 +252,7 @@ export function GraphCanvas({ nodes, edges }: { nodes: GraphNode[]; edges: Graph
                 y2={cy[t]}
                 stroke={lit ? "#a78bfa" : "#3f3f46"}
                 strokeWidth={lit ? 2 : 1}
-                strokeDasharray={e.kind === "project" ? "4 4" : undefined}
+                strokeDasharray={e.kind !== "connection" ? "4 4" : undefined}
                 opacity={hover != null && !lit ? 0.25 : 0.7}
               />
             );
@@ -274,7 +275,8 @@ export function GraphCanvas({ nodes, edges }: { nodes: GraphNode[]; edges: Graph
                 onPointerEnter={() => setHover(nd.id)}
                 onPointerLeave={() => setHover((h) => (h === nd.id ? null : h))}
                 onClick={() => {
-                  if (!moved.current) router.push(`/entry/${nd.id}`);
+                  if (moved.current) return;
+                  router.push(nd.type === "commitment" ? "/commitments" : `/entry/${nd.id}`);
                 }}
               >
                 <circle r={r} fill={COLORS[nd.type] ?? "#a1a1aa"} stroke="#09090b" strokeWidth={2} />

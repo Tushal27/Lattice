@@ -5,7 +5,7 @@
 //  - Static assets (_next, icons, fonts): stale-while-revalidate.
 //  - API requests: always network (data should never be stale silently).
 
-const VERSION = "lattice-v1";
+const VERSION = "lattice-v2";
 const PRECACHE = `precache-${VERSION}`;
 const RUNTIME = `runtime-${VERSION}`;
 const PRECACHE_URLS = ["/offline", "/icon-192.png", "/icon-512.png", "/manifest.webmanifest"];
@@ -68,4 +68,39 @@ self.addEventListener("fetch", (event) => {
       }),
     );
   }
+});
+
+// --- Web Push -------------------------------------------------------------
+self.addEventListener("push", (event) => {
+  let data = { title: "Lattice", body: "", url: "/" };
+  try {
+    if (event.data) data = { ...data, ...event.data.json() };
+  } catch {
+    if (event.data) data.body = event.data.text();
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      tag: data.tag || "lattice",
+      data: { url: data.url || "/" },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = (event.notification.data && event.notification.data.url) || "/";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if ("focus" in client) {
+          client.navigate(target);
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(target);
+    }),
+  );
 });

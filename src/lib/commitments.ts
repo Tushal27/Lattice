@@ -264,6 +264,29 @@ export async function commitmentCounts() {
   return { overdue, today, due: overdue + today };
 }
 
+/** Longer-horizon analytics: completions over the last 6 weeks + by source. */
+export async function commitmentAnalytics() {
+  const all = await prisma.commitment.findMany({ select: { status: true, completedAt: true, sourceType: true } });
+  const now = Date.now();
+
+  // weeks[5] = current 7-day window, weeks[0] = five weeks ago.
+  const weeks = Array.from({ length: 6 }, () => 0);
+  for (const c of all) {
+    if (!c.completedAt) continue;
+    const w = Math.floor((now - new Date(c.completedAt).getTime()) / (7 * 86_400_000));
+    if (w >= 0 && w < 6) weeks[5 - w]++;
+  }
+
+  const bySource: Record<string, { done: number; total: number }> = {};
+  for (const c of all) {
+    const k = c.sourceType || "manual";
+    (bySource[k] ??= { done: 0, total: 0 }).total++;
+    if (c.status === "done") bySource[k].done++;
+  }
+
+  return { weeks, bySource };
+}
+
 /** A guilt-free weekly review: completion, streak, areas. */
 export async function commitmentWeeklyReview() {
   const weekAgo = new Date();

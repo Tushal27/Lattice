@@ -36,6 +36,13 @@ export interface ExecutedStep {
   entryTitle?: string;
 }
 
+export interface SuggestedCommitment {
+  title: string;
+  due: string;
+  sourceType: string;
+  sourceId: string;
+}
+
 export interface AgentResult {
   reply: string;
   steps: ExecutedStep[];
@@ -43,6 +50,8 @@ export interface AgentResult {
   provider?: string;
   /** True if any write happened, so the UI can refresh data. */
   mutated: boolean;
+  /** A follow-through the user can confirm (not auto-saved). */
+  suggestion?: SuggestedCommitment;
 }
 
 export interface AgentTurn {
@@ -185,12 +194,27 @@ export async function runAgent(
     }
   }
 
+  // Offer (don't impose) a follow-through when a decision or question was just
+  // captured and the user didn't already set a commitment this turn.
+  let suggestion: SuggestedCommitment | undefined;
+  const madeCommitment = steps.some((s) => s.tool === "create_commitment" && s.ok);
+  const actionable = steps.find(
+    (s) => s.tool === "create_entry" && s.ok && s.entryId && (s.entryType === "decision" || s.entryType === "question"),
+  );
+  if (actionable && !madeCommitment) {
+    suggestion =
+      actionable.entryType === "decision"
+        ? { title: `Review decision: ${actionable.entryTitle}`, due: "in 14 days", sourceType: "decision", sourceId: actionable.entryId! }
+        : { title: `Research: ${actionable.entryTitle}`, due: "in 7 days", sourceType: "question", sourceId: actionable.entryId! };
+  }
+
   return {
     reply: reply || "Done.",
     steps,
     source: "ai",
     provider,
     mutated: steps.some((s) => s.ok && WRITE_TOOLS.has(s.tool)),
+    suggestion,
   };
 }
 

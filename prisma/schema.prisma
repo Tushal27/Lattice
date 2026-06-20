@@ -90,3 +90,31 @@ model Commitment {
   @@index([dueDate])
 }
 
+// A proactive nudge surfaced from the user's data (a decision ready to review,
+// a forgotten question, an emerging interest, a repeated pattern…). Generated
+// idempotently from a stable `key`; dismissals persist so it won't nag again.
+model InsightTrigger {
+  id        String   @id @default(cuid())
+  key       String   @unique // stable dedup key, e.g. "decision-review:<entryId>"
+  type      String // DecisionReviewReady | ForgottenQuestion | RepeatedPattern | EmergingInterest | MistakeWarning | ProjectStalled | CommitmentOpportunity
+  title     String
+  body      String?
+  entityId  String? // related entry id, if any
+  priority  Int      @default(0)
+  status    String   @default("active") // active | dismissed | acted
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+// A browser Web Push subscription (one per device/browser). Optional: if no
+// VAPID keys are configured the app simply falls back to in-app nudges.
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+}
+

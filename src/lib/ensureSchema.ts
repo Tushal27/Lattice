@@ -63,6 +63,28 @@ const STATEMENTS = [
   )`,
   `CREATE INDEX IF NOT EXISTS "Commitment_status_idx" ON "Commitment"("status")`,
   `CREATE INDEX IF NOT EXISTS "Commitment_dueDate_idx" ON "Commitment"("dueDate")`,
+  `CREATE TABLE IF NOT EXISTS "InsightTrigger" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "key" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "body" TEXT,
+    "entityId" TEXT,
+    "priority" INTEGER NOT NULL DEFAULT 0,
+    "status" TEXT NOT NULL DEFAULT 'active',
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "InsightTrigger_key_key" ON "InsightTrigger"("key")`,
+  `CREATE INDEX IF NOT EXISTS "InsightTrigger_status_idx" ON "InsightTrigger"("status")`,
+  `CREATE TABLE IF NOT EXISTS "PushSubscription" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "endpoint" TEXT NOT NULL,
+    "p256dh" TEXT NOT NULL,
+    "auth" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "PushSubscription_endpoint_key" ON "PushSubscription"("endpoint")`,
 ];
 
 let done: Promise<void> | null = null;

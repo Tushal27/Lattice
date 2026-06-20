@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { EntryCard } from "@/components/EntryCard";
+import { InsightFeed } from "@/components/InsightFeed";
 import { OpenChatButton } from "@/components/OpenChatButton";
 import { StatGrid } from "@/components/StatGrid";
 import { decisionsAwaitingReview, getStats, listEntries } from "@/lib/entries";
 import { groupedCommitments } from "@/lib/commitments";
+import { refreshInsights, type InsightRow } from "@/lib/insights";
 import { prisma } from "@/lib/db";
 import { relativeTime } from "@/lib/utils";
 
@@ -18,7 +20,7 @@ function greeting() {
 }
 
 export default async function Home() {
-  const [stats, recent, awaitingReview, openQuestions, commitments] = await Promise.all([
+  const [stats, recent, awaitingReview, openQuestions, commitments, insights] = await Promise.all([
     getStats(),
     listEntries({ limit: 6 }),
     decisionsAwaitingReview(),
@@ -29,9 +31,17 @@ export default async function Home() {
       select: { id: true, title: true },
     }),
     groupedCommitments(),
+    refreshInsights(),
   ]);
 
   const dueNow = [...commitments.overdue, ...commitments.today];
+  const insightItems = insights.map((i: InsightRow) => ({
+    id: i.id,
+    type: i.type,
+    title: i.title,
+    body: i.body,
+    entityId: i.entityId,
+  }));
 
   const today = new Date().toLocaleDateString(undefined, {
     weekday: "long",
@@ -74,6 +84,9 @@ export default async function Home() {
 
       {/* Area stats */}
       <StatGrid counts={stats.byType} />
+
+      {/* Proactive intelligence */}
+      <InsightFeed initial={insightItems} />
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
         {/* Recent */}

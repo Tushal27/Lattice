@@ -99,8 +99,39 @@ follow-through layer — reminders, decision reviews to run, and habits.
   Review** lists due commitments to close out or snooze.
 - **Actions:** ✓ complete, snooze (to tomorrow), or remove. Each commitment can
   carry a priority (low/medium/high).
-- **Weekly review:** `/commitments` shows a guilt-free summary — completed this
-  week, follow-through %, and your current day-streak.
+- **Weekly review + analytics:** `/commitments` shows a guilt-free summary
+  (completed this week, follow-through %, day-streak) plus a 6-week completion
+  chart and a by-source breakdown.
+- **AI-suggested follow-throughs:** when you capture a decision or a question in
+  the ✦ agent, it proposes a fitting commitment (e.g. "Review this decision · in
+  14 days") that you **confirm before it saves** — never auto-created.
+
+---
+
+## 5c. Proactive intelligence (it notices things for you)
+
+Lattice studies your data and surfaces a small, dismissible set of **insight
+triggers** on the Dashboard ("✨ For you"):
+
+- **DecisionReviewReady** — a decision is old enough to grade.
+- **MistakeWarning** — something you just captured echoes a past lesson.
+- **ForgottenQuestion** — an open question has gone quiet.
+- **EmergingInterest** / **RepeatedPattern** — a tag/theme is accelerating or
+  recurring across many entries.
+- **ProjectStalled** — an active project with no recent movement.
+- **CommitmentOpportunity** — a recent decision/lesson with no follow-through
+  yet (one tap to add a reminder).
+
+Triggers are computed from your data and remembered by a stable key, so
+**dismissing one keeps it gone** and a resolved condition clears itself.
+
+**Notifications.** In-app nudges + the sidebar badge always work. If you add
+**VAPID keys**, Lattice also sends **Web Push** (a daily digest of what's due and
+what's new, via a Vercel Cron) even when the app is closed — enable it from the
+toggle on `/commitments`. Without VAPID keys, push is silently skipped.
+
+**Graph.** Commitments tied to an entry appear as teal satellite nodes linked to
+their source, so the graph shows knowledge *and* the action it spawned.
 
 ---
 
@@ -174,7 +205,8 @@ them in order until one answers (rate-limited/down providers fall through):
   `fields` JSON [type-specific + Details + review fields + reviewedAt],
   occurredAt, timestamps, projectId self-relation); `Tag`/`EntryTag`;
   `Connection` (undirected); `Commitment` (title, status, dueDate, recurringRule,
-  priority, source).
+  priority, source); `InsightTrigger` (key, type, status — proactive nudges);
+  `PushSubscription` (Web Push endpoints).
 - **Flow:** Server Components read via `src/lib/entries.ts` (Prisma) directly;
   client mutations hit **API route handlers** then refresh / update optimistically.
 
@@ -183,6 +215,8 @@ them in order until one answers (rate-limited/down providers fall through):
 src/lib/types.ts        area + field config (drives forms, detail, agent schema)
 src/lib/entries.ts      data access, tags, search, suggestions, auto-link, review
 src/lib/commitments.ts  commitments data + natural-language date/recurrence parsing
+src/lib/insights.ts     proactive insight-trigger generation (dismiss-aware)
+src/lib/push.ts         optional Web Push (VAPID) — no-ops without keys
 src/lib/ai.ts           provider engine, fallback chain, vision
 src/lib/agent.ts        tool-using agent loop
 src/lib/companion.ts    reflect / connect / classify / judgment / quiz / ask
@@ -212,6 +246,11 @@ npm run dev
    `GROQ_API_KEY`, etc.) → Deploy. Schema auto-creates; pushes to `main`
    auto-redeploy.
 3. Open the URL on your phone → **Add to Home Screen**.
+4. *(Optional)* **Web Push:** set `VAPID_PUBLIC_KEY` + `VAPID_PRIVATE_KEY`
+   (generate with `npx web-push generate-vapid-keys`), optionally `VAPID_SUBJECT`
+   (a `mailto:` URL) and `CRON_SECRET`. A Vercel Cron (`vercel.json`, daily 08:00)
+   hits `/api/cron/notify` to send the digest. Skip this and the app uses in-app
+   nudges only.
 
 **Scripts:** `dev`, `build`, `start`, `lint`, `db:setup`, `db:seed`,
 `db:reset`, `db:turso`.

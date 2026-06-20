@@ -21,6 +21,13 @@ interface Step {
   entryTitle?: string;
 }
 
+interface Suggestion {
+  title: string;
+  due: string;
+  sourceType: string;
+  sourceId: string;
+}
+
 interface Msg {
   role: "you" | "ai";
   text: string;
@@ -30,6 +37,7 @@ interface Msg {
   steps?: Step[];
   saved?: boolean;
   images?: string[];
+  suggestion?: Suggestion;
 }
 
 const SUGGESTIONS: Record<Mode, string[]> = {
@@ -162,7 +170,15 @@ export function FloatingChat() {
         const data = await res.json();
         setMessages((m) => [
           ...m,
-          { role: "ai", mode: "capture", text: data.reply, source: data.source, provider: data.provider, steps: data.steps },
+          {
+            role: "ai",
+            mode: "capture",
+            text: data.reply,
+            source: data.source,
+            provider: data.provider,
+            steps: data.steps,
+            suggestion: data.suggestion,
+          },
         ]);
         if (data.mutated) router.refresh();
       }
@@ -373,6 +389,8 @@ export function FloatingChat() {
                           </div>
                         )}
 
+                        {m.suggestion && <SuggestionCard suggestion={m.suggestion} onAdded={() => router.refresh()} />}
+
                         {m.source === "ai" && (
                           <MessageActions
                             text={m.text}
@@ -543,6 +561,65 @@ export function FloatingChat() {
         )}
       </AnimatePresence>
     </>
+  );
+}
+
+function SuggestionCard({ suggestion, onAdded }: { suggestion: Suggestion; onAdded: () => void }) {
+  const [state, setState] = useState<"idle" | "adding" | "added" | "dismissed">("idle");
+  if (state === "dismissed") return null;
+
+  async function add() {
+    setState("adding");
+    try {
+      const res = await fetch("/api/commitments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: suggestion.title,
+          due: suggestion.due,
+          sourceType: suggestion.sourceType,
+          sourceId: suggestion.sourceId,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      setState("added");
+      onAdded();
+    } catch {
+      setState("idle");
+    }
+  }
+
+  return (
+    <div className="mt-3 rounded-xl border border-violet-400/25 bg-violet-500/5 p-3">
+      <div className="flex items-start gap-2.5">
+        <span className="text-base">🎯</span>
+        <div className="min-w-0 flex-1">
+          <div className="text-[11px] font-medium text-violet-300">Suggested follow-through</div>
+          <div className="text-sm text-zinc-200">
+            {suggestion.title} <span className="text-zinc-500">· {suggestion.due}</span>
+          </div>
+          {state === "added" ? (
+            <div className="mt-1 text-xs text-emerald-300">✓ Added to commitments</div>
+          ) : (
+            <div className="mt-2 flex gap-2">
+              <button
+                onClick={add}
+                disabled={state === "adding"}
+                className="press rounded-lg bg-violet-600/90 px-3 py-1 text-xs font-medium text-white hover:bg-violet-600 disabled:opacity-50"
+              >
+                ＋ Add reminder
+              </button>
+              <button
+                onClick={() => setState("dismissed")}
+                className="press rounded-lg px-3 py-1 text-xs text-zinc-400 hover:bg-white/10 hover:text-zinc-200"
+              >
+                No thanks
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
