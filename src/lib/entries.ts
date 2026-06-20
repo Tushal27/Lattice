@@ -285,7 +285,7 @@ export async function suggestConnections(entryId: string, limit = 5) {
   const candidates = await prisma.entry.findMany({
     include: { tags: { include: { tag: true } } },
     orderBy: { updatedAt: "desc" },
-    take: 200,
+    take: 100,
   });
 
   const scored = candidates

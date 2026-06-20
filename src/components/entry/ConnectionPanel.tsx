@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Markdown } from "@/components/Markdown";
 import { TypeBadge } from "@/components/ui";
 
@@ -27,28 +26,48 @@ export function ConnectionPanel({
   existing: ExistingConnection[];
   suggestions: RelatedEntry[];
 }) {
-  const router = useRouter();
+  // Local, optimistic state so link/unlink feel instant — no full page refresh.
+  const [existingList, setExistingList] = useState(existing);
+  const [suggestList, setSuggestList] = useState(suggestions);
   const [busy, setBusy] = useState<string | null>(null);
   const [insight, setInsight] = useState<string | null>(null);
   const [insightSource, setInsightSource] = useState<"ai" | "local" | null>(null);
   const [loadingInsight, setLoadingInsight] = useState(false);
 
-  async function link(toId: string) {
-    setBusy(toId);
-    await fetch("/api/connections", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fromId: entryId, toId }),
-    });
-    setBusy(null);
-    router.refresh();
+  async function link(s: RelatedEntry) {
+    setBusy(s.id);
+    const tempId = `pending-${s.id}`;
+    setSuggestList((prev) => prev.filter((x) => x.id !== s.id));
+    setExistingList((prev) => [{ connectionId: tempId, note: null, ...s }, ...prev]);
+    try {
+      const res = await fetch("/api/connections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fromId: entryId, toId: s.id }),
+      });
+      const conn = await res.json();
+      setExistingList((prev) =>
+        prev.map((x) => (x.connectionId === tempId ? { ...x, connectionId: conn.id ?? tempId } : x)),
+      );
+    } catch {
+      // revert
+      setExistingList((prev) => prev.filter((x) => x.connectionId !== tempId));
+      setSuggestList((prev) => [s, ...prev]);
+    } finally {
+      setBusy(null);
+    }
   }
 
-  async function unlink(connectionId: string) {
-    setBusy(connectionId);
-    await fetch(`/api/connections?id=${connectionId}`, { method: "DELETE" });
-    setBusy(null);
-    router.refresh();
+  async function unlink(c: ExistingConnection) {
+    setBusy(c.connectionId);
+    setExistingList((prev) => prev.filter((x) => x.connectionId !== c.connectionId));
+    try {
+      await fetch(`/api/connections?id=${c.connectionId}`, { method: "DELETE" });
+    } catch {
+      setExistingList((prev) => [c, ...prev]);
+    } finally {
+      setBusy(null);
+    }
   }
 
   async function askInsight() {
@@ -69,11 +88,11 @@ export function ConnectionPanel({
     <div className="space-y-6">
       <section>
         <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-400">Connections</h3>
-        {existing.length === 0 ? (
+        {existingList.length === 0 ? (
           <p className="text-sm text-zinc-500">No connections yet. Link this to related ideas below.</p>
         ) : (
           <ul className="space-y-2">
-            {existing.map((c) => (
+            {existingList.map((c) => (
               <li
                 key={c.connectionId}
                 className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-900/40 p-3"
@@ -85,7 +104,7 @@ export function ConnectionPanel({
                   <p className="truncate text-sm text-zinc-200">{c.title}</p>
                 </Link>
                 <button
-                  onClick={() => unlink(c.connectionId)}
+                  onClick={() => unlink(c)}
                   disabled={busy === c.connectionId}
                   className="shrink-0 text-xs text-zinc-500 transition-colors hover:text-rose-400 disabled:opacity-50"
                 >
@@ -97,7 +116,7 @@ export function ConnectionPanel({
         )}
       </section>
 
-      {suggestions.length > 0 && (
+      {suggestList.length > 0 && (
         <section>
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-400">You might connect…</h3>
@@ -120,7 +139,7 @@ export function ConnectionPanel({
           )}
 
           <ul className="space-y-2">
-            {suggestions.map((s) => (
+            {suggestList.map((s) => (
               <li
                 key={s.id}
                 className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-900/30 p-3"
@@ -132,7 +151,7 @@ export function ConnectionPanel({
                   <p className="truncate text-sm text-zinc-300">{s.title}</p>
                 </Link>
                 <button
-                  onClick={() => link(s.id)}
+                  onClick={() => link(s)}
                   disabled={busy === s.id}
                   className="shrink-0 rounded-lg border border-zinc-700 px-2.5 py-1 text-xs text-zinc-300 transition-colors hover:border-violet-500/50 hover:text-violet-300 disabled:opacity-50"
                 >
