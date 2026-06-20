@@ -2,18 +2,25 @@ import Link from "next/link";
 import { EntryCard } from "@/components/EntryCard";
 import { PageHeader, TypeBadge } from "@/components/ui";
 import { decisionsAwaitingReview, onThisDay, resurface } from "@/lib/entries";
+import { groupedCommitments } from "@/lib/commitments";
 import { relativeTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 export default async function ReviewPage() {
-  const [toReview, resurfaced, history] = await Promise.all([
+  const [toReview, resurfaced, history, commitments] = await Promise.all([
     decisionsAwaitingReview(),
     resurface(3),
     onThisDay(),
+    groupedCommitments(),
   ]);
 
-  const nothing = toReview.length === 0 && resurfaced.length === 0 && history.length === 0;
+  const dueCommitments = [...commitments.overdue, ...commitments.today];
+  const nothing =
+    toReview.length === 0 &&
+    resurfaced.length === 0 &&
+    history.length === 0 &&
+    dueCommitments.length === 0;
 
   return (
     <div className="animate-[fadeUp_0.4s_ease-out] space-y-10">
@@ -34,6 +41,40 @@ export default async function ReviewPage() {
             Capture something →
           </Link>
         </div>
+      )}
+
+      {dueCommitments.length > 0 && (
+        <section>
+          <h2 className="mb-1 text-lg font-semibold text-zinc-100">🎯 Commitments due</h2>
+          <p className="mb-4 text-sm text-zinc-500">Follow-throughs you set for yourself. Close the loop or snooze them.</p>
+          <div className="space-y-2">
+            {dueCommitments.map((c) => {
+              const overdue = commitments.overdue.some((o) => o.id === c.id);
+              return (
+                <Link
+                  key={c.id}
+                  href="/commitments"
+                  className={`flex items-center justify-between gap-3 rounded-xl border p-4 transition-colors ${
+                    overdue
+                      ? "border-rose-500/20 bg-rose-500/5 hover:border-rose-500/40"
+                      : "border-emerald-500/20 bg-emerald-500/5 hover:border-emerald-500/40"
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-zinc-100">{c.title}</p>
+                    <p className={`text-xs ${overdue ? "text-rose-200/70" : "text-emerald-200/70"}`}>
+                      {overdue ? "overdue" : "due today"}
+                      {c.recurringRule && ` · 🔁 ${c.recurringRule}`}
+                    </p>
+                  </div>
+                  <span className={`shrink-0 text-sm font-medium ${overdue ? "text-rose-300" : "text-emerald-300"}`}>
+                    Open →
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
       )}
 
       {toReview.length > 0 && (

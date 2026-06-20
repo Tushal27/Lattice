@@ -3,6 +3,7 @@ import { EntryCard } from "@/components/EntryCard";
 import { OpenChatButton } from "@/components/OpenChatButton";
 import { StatGrid } from "@/components/StatGrid";
 import { decisionsAwaitingReview, getStats, listEntries } from "@/lib/entries";
+import { groupedCommitments } from "@/lib/commitments";
 import { prisma } from "@/lib/db";
 import { relativeTime } from "@/lib/utils";
 
@@ -17,7 +18,7 @@ function greeting() {
 }
 
 export default async function Home() {
-  const [stats, recent, awaitingReview, openQuestions] = await Promise.all([
+  const [stats, recent, awaitingReview, openQuestions, commitments] = await Promise.all([
     getStats(),
     listEntries({ limit: 6 }),
     decisionsAwaitingReview(),
@@ -27,7 +28,10 @@ export default async function Home() {
       take: 4,
       select: { id: true, title: true },
     }),
+    groupedCommitments(),
   ]);
+
+  const dueNow = [...commitments.overdue, ...commitments.today];
 
   const today = new Date().toLocaleDateString(undefined, {
     weekday: "long",
@@ -98,6 +102,34 @@ export default async function Home() {
 
         {/* Side rail: nudges */}
         <aside className="space-y-6">
+          {dueNow.length > 0 && (
+            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+              <h3 className="mb-2 flex items-center justify-between text-sm font-semibold text-emerald-200">
+                <span className="flex items-center gap-2">🎯 Commitments</span>
+                {commitments.overdue.length > 0 && (
+                  <span className="rounded-full bg-rose-500/20 px-2 py-0.5 text-[11px] text-rose-300">
+                    {commitments.overdue.length} overdue
+                  </span>
+                )}
+              </h3>
+              <p className="mb-3 text-xs text-emerald-200/70">Your follow-throughs for today.</p>
+              <ul className="space-y-2">
+                {dueNow.slice(0, 5).map((c) => (
+                  <li key={c.id} className="flex items-start gap-2">
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
+                    <span className="text-sm text-zinc-200">{c.title}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link
+                href="/commitments"
+                className="mt-3 inline-block text-xs font-medium text-emerald-300 hover:underline"
+              >
+                View all →
+              </Link>
+            </div>
+          )}
+
           {awaitingReview.length > 0 && (
             <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4">
               <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-200">⏳ Time to review</h3>

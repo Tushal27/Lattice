@@ -45,8 +45,13 @@ const SUGGESTIONS: Record<Mode, string[]> = {
   ],
 };
 
-const WRITE_TOOLS = new Set(["create_entry", "update_entry", "connect_entries"]);
-const VERB: Record<string, string> = { create_entry: "Created", update_entry: "Updated", connect_entries: "Linked" };
+const WRITE_TOOLS = new Set(["create_entry", "update_entry", "connect_entries", "create_commitment"]);
+const VERB: Record<string, string> = {
+  create_entry: "Created",
+  update_entry: "Updated",
+  connect_entries: "Linked",
+  create_commitment: "Committed",
+};
 
 export function FloatingChat() {
   const router = useRouter();
@@ -463,7 +468,8 @@ export function FloatingChat() {
 }
 
 function ActionCard({ step, onNavigate }: { step: Step; onNavigate: () => void }) {
-  const icon = step.entryType ? TYPES[step.entryType as EntryType]?.icon : "🔗";
+  const isCommitment = step.tool === "create_commitment";
+  const icon = isCommitment ? "🎯" : step.entryType ? TYPES[step.entryType as EntryType]?.icon : "🔗";
   const verb = VERB[step.tool] ?? "Did";
   const label = step.ok ? verb : "Couldn't " + verb.toLowerCase();
   const body = (
@@ -477,13 +483,19 @@ function ActionCard({ step, onNavigate }: { step: Step; onNavigate: () => void }
         <div className={`text-[11px] font-medium ${step.ok ? "text-emerald-300" : "text-rose-300"}`}>{label}</div>
         <div className="truncate text-zinc-200">{step.entryTitle ?? step.summary}</div>
       </div>
-      {step.entryId && step.ok && <span className="shrink-0 text-xs text-zinc-500">open →</span>}
+      {((step.entryId && step.ok) || (isCommitment && step.ok)) && (
+        <span className="shrink-0 text-xs text-zinc-500">open →</span>
+      )}
     </div>
   );
 
-  if (step.entryId && step.ok) {
+  if (step.ok && (step.entryId || isCommitment)) {
     return (
-      <Link href={`/entry/${step.entryId}`} onClick={onNavigate} className="press block">
+      <Link
+        href={isCommitment ? "/commitments" : `/entry/${step.entryId}`}
+        onClick={onNavigate}
+        className="press block"
+      >
         {body}
       </Link>
     );

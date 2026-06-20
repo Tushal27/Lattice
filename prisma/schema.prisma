@@ -69,3 +69,24 @@ model Connection {
   @@unique([fromId, toId])
   @@index([toId])
 }
+
+// A follow-through item that emerges from knowledge (a decision to review, a
+// question to research, a habit). sourceId loosely references an Entry.
+model Commitment {
+  id            String    @id @default(cuid())
+  title         String
+  description   String?
+  status        String    @default("open") // open | done | cancelled
+  dueDate       DateTime?
+  completedAt   DateTime?
+  recurringRule String? // daily | weekly | monthly | weekly:mon …
+  priority      String? // low | medium | high
+  sourceType    String? // decision | lesson | aha | question | project | manual
+  sourceId      String? // related entry id (loose reference)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status])
+  @@index([dueDate])
+}
+

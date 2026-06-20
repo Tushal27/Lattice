@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 
 // Bump the version to re-show the refreshed guide once after a feature update.
-const SEEN_KEY = "lattice:guide-seen-v2";
+const SEEN_KEY = "lattice:guide-seen-v3";
 
 const STEPS = [
   {
@@ -21,6 +21,11 @@ const STEPS = [
     icon: "🧠",
     title: "Wonder vs Capture",
     body: "In the chat, switch to 🧠 Wonder to think out loud (nothing is saved) — reach something worth keeping and tap “✦ Save this.” Switch to ✦ Capture to just file things.",
+  },
+  {
+    icon: "🎯",
+    title: "Commitments",
+    body: "Turn knowledge into follow-through. Say “remind me to review the pricing call next week” or “meditate every morning” — the agent schedules it from your words. Due items surface on your Dashboard and in Daily Review.",
   },
   {
     icon: "☀️",

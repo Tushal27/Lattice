@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { TYPE_LIST } from "@/lib/types";
@@ -8,6 +9,7 @@ import { cn } from "@/lib/utils";
 const primary = [
   { href: "/", label: "Dashboard", icon: "◇" },
   { href: "/review", label: "Daily Review", icon: "☀️" },
+  { href: "/commitments", label: "Commitments", icon: "🎯" },
 ];
 
 const areas = TYPE_LIST.map((t) => ({
@@ -24,7 +26,7 @@ const discover = [
   { href: "/reflect", label: "Reflections", icon: "🔮" },
 ];
 
-function NavLink({ href, label, icon }: { href: string; label: string; icon: string }) {
+function NavLink({ href, label, icon, badge }: { href: string; label: string; icon: string; badge?: number }) {
   const pathname = usePathname();
   const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
   return (
@@ -36,7 +38,12 @@ function NavLink({ href, label, icon }: { href: string; label: string; icon: str
       )}
     >
       <span className="w-5 text-center text-base leading-none">{icon}</span>
-      <span>{label}</span>
+      <span className="flex-1">{label}</span>
+      {badge ? (
+        <span className="grid h-5 min-w-5 place-items-center rounded-full bg-amber-500/20 px-1.5 text-[11px] font-medium text-amber-300">
+          {badge}
+        </span>
+      ) : null}
     </Link>
   );
 }
@@ -46,6 +53,21 @@ function openCommand() {
 }
 
 export function Sidebar() {
+  const [dueCount, setDueCount] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/commitments")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d?.counts) setDueCount(d.counts.due ?? 0);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <aside className="hidden w-64 shrink-0 border-r border-zinc-800/80 bg-zinc-950/40 p-4 md:flex md:flex-col">
       <Link href="/" className="mb-6 flex items-center gap-2 px-2">
@@ -77,7 +99,7 @@ export function Sidebar() {
 
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto">
         {primary.map((n) => (
-          <NavLink key={n.href} {...n} />
+          <NavLink key={n.href} {...n} badge={n.href === "/commitments" ? dueCount : undefined} />
         ))}
         <div className="mt-4 mb-1 px-3 text-[11px] font-medium uppercase tracking-wider text-zinc-600">Areas</div>
         {areas.map((n) => (

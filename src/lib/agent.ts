@@ -8,6 +8,7 @@
 
 import { aiEnabled, generateDetailed } from "@/lib/ai";
 import { jsonrepair } from "jsonrepair";
+import { createCommitment, parseDueDate, parseRecurrence, seedRecurringDue } from "@/lib/commitments";
 import {
   addConnection,
   autoLinkByTags,
@@ -54,7 +55,7 @@ interface ParsedAgent {
   done?: boolean;
 }
 
-const WRITE_TOOLS = new Set(["create_entry", "update_entry", "connect_entries"]);
+const WRITE_TOOLS = new Set(["create_entry", "update_entry", "connect_entries", "create_commitment"]);
 
 export async function runAgent(
   message: string,
@@ -166,6 +167,8 @@ async function execute(
         return await updateTool(a);
       case "connect_entries":
         return await connectTool(a);
+      case "create_commitment":
+        return await commitmentTool(a);
       case "search_entries":
         return await searchTool(a);
       case "get_entry":
@@ -252,6 +255,38 @@ async function connectTool(args: Record<string, unknown>): Promise<ExecutedStep>
   if (!a || !b) return { tool: "connect_entries", ok: false, summary: "Couldn't link — entry not found" };
   await addConnection(fromId, toId, args.note ? String(args.note) : null);
   return { tool: "connect_entries", ok: true, summary: `Linked “${a.title}” ↔ “${b.title}”` };
+}
+
+async function commitmentTool(args: Record<string, unknown>): Promise<ExecutedStep> {
+  const title = String(args.title ?? "").trim();
+  if (!title) return { tool: "create_commitment", ok: false, summary: "A commitment needs a title" };
+  const dueRaw = args.due != null ? String(args.due) : null;
+  let dueDate = parseDueDate(dueRaw);
+  const recurringRule =
+    (args.recurring != null && String(args.recurring)) ||
+    parseRecurrence(dueRaw) ||
+    parseRecurrence(title) ||
+    null;
+  if (recurringRule && !dueDate) dueDate = seedRecurringDue(recurringRule, `${dueRaw ?? ""} ${title}`);
+  const c = await createCommitment({
+    title,
+    description: args.note != null ? String(args.note) : null,
+    dueDate,
+    recurringRule: recurringRule || null,
+    priority: args.priority != null ? String(args.priority) : null,
+    sourceType: args.sourceType != null ? String(args.sourceType) : "agent",
+    sourceId: args.sourceId != null ? String(args.sourceId) : null,
+  });
+  const when = dueDate
+    ? ` · due ${dueDate.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
+    : "";
+  void c;
+  return {
+    tool: "create_commitment",
+    ok: true,
+    summary: `Set a commitment: ${title}${when}`,
+    entryTitle: title,
+  };
 }
 
 async function searchTool(args: Record<string, unknown>): Promise<ExecutedStep> {
@@ -366,6 +401,7 @@ const AGENT_SYSTEM = [
   '- create_entry{type, title, summary?, confidence?(0-100), status?, occurredAt?(YYYY-MM-DD), tags?[], projectId?, fields?{...}} — create a fully-filled entry.',
   "- update_entry{id, ...same fields} — change an existing entry (e.g. mark a question answered, add a decision review).",
   "- connect_entries{fromId, toId, note?} — link two related entries.",
+  '- create_commitment{title, due?, recurring?, priority?, note?} — set a follow-through/reminder. `due` is natural language ("tomorrow at 9", "next monday", "in 3 days", "2026-07-01"); `recurring` is daily|weekly|monthly; priority is low|medium|high.',
   "- search_entries{query} — find entries (use before update/connect to get real ids).",
   "- get_entry{id} — read one entry's full details.",
   "- list_projects{} / list_recent{limit?} — browse.",
@@ -382,6 +418,7 @@ const AGENT_SYSTEM = [
   "- For decisions, estimate a confidence (0-100) from how sure they sound. Do NOT set review-only fields when first creating a decision.",
   "- REVIEWING A DECISION: when the user grades how a past decision turned out (e.g. \"review my X decision\", \"that call worked out\", \"it was the wrong move\"), first search_entries to find its id, then update_entry with the review-only fields: reviewOutcome (what actually happened), reviewVerdict (Right call|Mixed|Wrong call|Too early to tell), wouldRepeat (Yes|No|Not sure), reviewLearning. Don't change the original decision text.",
   "- When the user is simply capturing a thought, create ONE entry and STOP — do not connect, search, or create extras. Set done=true.",
+  '- COMMITMENTS / REMINDERS: when the user wants to do something later, set a reminder, schedule a follow-up, or commit to a habit ("remind me to…", "I need to … by Friday", "every morning I want to…", "follow up on X next week"), use create_commitment with the natural-language due date. Don\'t also create an entry for a pure reminder. Set done=true.',
   "- Only connect_entries when the user explicitly asks to link things, and only with real ids from the context or a search result. NEVER invent ids or use a title as an id. If you don't have a real id, don't connect.",
   "- Do each write at most once. After your write actions, set done=true and give a short, friendly reply describing what you saved.",
   "- If the user is just chatting or asking about their data, use read tools or none, answer in `reply`, and set done=true.",

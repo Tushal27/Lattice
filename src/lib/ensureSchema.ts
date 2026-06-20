@@ -47,6 +47,22 @@ const STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS "EntryTag_tagId_idx" ON "EntryTag"("tagId")`,
   `CREATE INDEX IF NOT EXISTS "Connection_toId_idx" ON "Connection"("toId")`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "Connection_fromId_toId_key" ON "Connection"("fromId", "toId")`,
+  `CREATE TABLE IF NOT EXISTS "Commitment" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "title" TEXT NOT NULL,
+    "description" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'open',
+    "dueDate" DATETIME,
+    "completedAt" DATETIME,
+    "recurringRule" TEXT,
+    "priority" TEXT,
+    "sourceType" TEXT,
+    "sourceId" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "Commitment_status_idx" ON "Commitment"("status")`,
+  `CREATE INDEX IF NOT EXISTS "Commitment_dueDate_idx" ON "Commitment"("dueDate")`,
 ];
 
 let done: Promise<void> | null = null;

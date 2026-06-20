@@ -82,6 +82,28 @@ provider (e.g. "connected · custom"). Input is a paste-friendly auto-growing bo
 
 ---
 
+## 5b. Commitments (turn knowledge into follow-through)
+
+Knowledge is only worth something if you act on it. **Commitments** are the
+follow-through layer — reminders, decision reviews to run, and habits.
+
+- **Natural-language scheduling:** tell the ✦ agent (Capture) “*remind me to
+  review the pricing decision next week*”, “*call the bank tomorrow at 9am*”, or
+  “*meditate every morning*” and it sets a commitment with the right due date and
+  recurrence. You can also add one manually on **`/commitments`** (a free-text
+  “when?” box understands “next monday”, “in 3 days”, “2026-07-01”, etc.).
+- **Recurring:** daily / weekly / monthly (and “every monday”). Completing a
+  recurring commitment automatically spawns the next occurrence.
+- **Where they surface (in-app notifications):** a **Dashboard** card shows
+  what’s due today / overdue, the **sidebar** shows a count badge, and **Daily
+  Review** lists due commitments to close out or snooze.
+- **Actions:** ✓ complete, snooze (to tomorrow), or remove. Each commitment can
+  carry a priority (low/medium/high).
+- **Weekly review:** `/commitments` shows a guilt-free summary — completed this
+  week, follow-through %, and your current day-streak.
+
+---
+
 ## 6. Every screen
 
 - **Dashboard (`/`)** — greeting, animated area stats, recent entries, nudges
@@ -93,8 +115,11 @@ provider (e.g. "connected · custom"). Input is a paste-friendly auto-growing bo
   suggested + "✦ Ask AI why"). Edit / Delete.
 - **Test Me (`/learn`)** — active-recall flashcards on your lessons & aha
   moments; AI-written recall questions, Reveal, rate Got it / Fuzzy.
-- **Daily Review (`/review`)** — decisions ready to judge, resurfaced
-  lessons/insights, and "on this day."
+- **Commitments (`/commitments`)** — follow-throughs grouped by Overdue / Today
+  / Upcoming, a quick-add box with natural-language dates, complete/snooze/
+  remove, and a weekly follow-through summary.
+- **Daily Review (`/review`)** — commitments due, decisions ready to judge,
+  resurfaced lessons/insights, and "on this day."
 - **Reflections (`/reflect`)** — proactive weekly/monthly coach: takeaways,
   patterns, *which decisions to review*, *which entries to connect*.
 - **Patterns (`/patterns`)** — attention distribution, decision calibration,
@@ -148,7 +173,8 @@ them in order until one answers (rate-limited/down providers fall through):
 - **Data model:** `Entry` (type, title, summary, status, confidence,
   `fields` JSON [type-specific + Details + review fields + reviewedAt],
   occurredAt, timestamps, projectId self-relation); `Tag`/`EntryTag`;
-  `Connection` (undirected).
+  `Connection` (undirected); `Commitment` (title, status, dueDate, recurringRule,
+  priority, source).
 - **Flow:** Server Components read via `src/lib/entries.ts` (Prisma) directly;
   client mutations hit **API route handlers** then refresh / update optimistically.
 
@@ -156,6 +182,7 @@ them in order until one answers (rate-limited/down providers fall through):
 ```
 src/lib/types.ts        area + field config (drives forms, detail, agent schema)
 src/lib/entries.ts      data access, tags, search, suggestions, auto-link, review
+src/lib/commitments.ts  commitments data + natural-language date/recurrence parsing
 src/lib/ai.ts           provider engine, fallback chain, vision
 src/lib/agent.ts        tool-using agent loop
 src/lib/companion.ts    reflect / connect / classify / judgment / quiz / ask
