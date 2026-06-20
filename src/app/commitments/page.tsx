@@ -1,4 +1,5 @@
 import { CommitmentList } from "@/components/CommitmentList";
+import { EmbeddingStatus } from "@/components/EmbeddingStatus";
 import { NotificationToggle } from "@/components/NotificationToggle";
 import { PageHeader } from "@/components/ui";
 import { commitmentAnalytics, commitmentWeeklyReview, groupedCommitments } from "@/lib/commitments";
@@ -49,6 +50,7 @@ export default async function CommitmentsPage() {
         subtitle="The follow-throughs your knowledge asks of you — reminders, reviews, and habits. Capture them by voice in the ✦ agent (“remind me to… next week”) or add one below."
       />
       <NotificationToggle />
+      <EmbeddingStatus />
       <CommitmentList initial={initial} review={review} />
 
       {(analytics.weeks.some((w) => w > 0) || sources.length > 0) && (
