@@ -9,6 +9,7 @@
 import { aiEnabled, generateDetailed } from "@/lib/ai";
 import { jsonrepair } from "jsonrepair";
 import { createCommitment, parseDueDate, parseRecurrence, seedRecurringDue } from "@/lib/commitments";
+import { classifyThought } from "@/lib/companion";
 import {
   addConnection,
   autoLinkByTags,
@@ -78,6 +79,7 @@ export async function runAgent(
   const createdTitles = new Set<string>();
   let reply = "";
   let provider: string | undefined;
+  let forcedCapture = false;
 
   for (let i = 0; i < MAX_STEPS; i++) {
     const prompt = buildPrompt(context, history, message, steps, readResults);
@@ -125,7 +127,52 @@ export async function runAgent(
     if (parsed.reply) reply = parsed.reply;
     // Once anything has been written, stop — prevents duplicate creates and
     // retry loops on a failed connect.
-    if (didWrite || parsed.done || parsed.actions.length === 0) break;
+    if (didWrite || parsed.done || parsed.actions.length === 0) {
+      // Capture-intent guard: models sometimes reply "Captured…" while emitting
+      // no create action, so nothing is actually saved. Force one corrective
+      // step before giving up.
+      const wroteAnything = steps.some((s) => s.ok && WRITE_TOOLS.has(s.tool));
+      if (opts.preserveRaw && !wroteAnything && !forcedCapture && claimsCapture(reply)) {
+        forcedCapture = true;
+        readResults.push(
+          "CRITICAL: You replied as if you saved something, but you emitted NO create action, so nothing was saved. The user's message is something to capture. Emit a create_entry now (or create_commitment if it's a reminder/task) with the best-fit type and full detail. Never claim to have captured/saved anything without the matching action in the same response.",
+        );
+        continue;
+      }
+      break;
+    }
+  }
+
+  // Final safety net: on a direct capture, if the model claimed it saved
+  // something but still emitted no write, create the entry ourselves so the
+  // user's input is never silently lost. Classification falls back to a local
+  // heuristic when the AI is unavailable.
+  if (opts.preserveRaw && claimsCapture(reply) && !steps.some((s) => s.ok && WRITE_TOOLS.has(s.tool))) {
+    try {
+      const c = await classifyThought(message);
+      const type = isEntryType(c.type) ? c.type : "lesson";
+      const input = buildEntryInput(type, {
+        type,
+        title: c.title,
+        summary: c.summary,
+        tags: c.tags,
+        details: message,
+      });
+      if (input?.title) {
+        const entry = await createEntry(input);
+        steps.push({
+          tool: "create_entry",
+          ok: true,
+          summary: `Created ${TYPES[type].label}: ${input.title}`,
+          entryId: entry.id,
+          entryType: type,
+          entryTitle: input.title,
+        });
+        if (!reply.trim()) reply = `Captured your ${TYPES[type].label.toLowerCase()} — “${input.title}”.`;
+      }
+    } catch (err) {
+      console.error("capture safety-net failed", err);
+    }
   }
 
   // Auto-connect freshly created entries to related ones (the graph builds
@@ -417,7 +464,8 @@ const AGENT_SYSTEM = [
   "- Fill EVERY relevant field. Be generous and specific: a real title, a one-line summary, context/reasoning, 2-4 lowercase tags. Leave a field empty only if the user truly gave nothing for it (do not write 'none').",
   "- For decisions, estimate a confidence (0-100) from how sure they sound. Do NOT set review-only fields when first creating a decision.",
   "- REVIEWING A DECISION: when the user grades how a past decision turned out (e.g. \"review my X decision\", \"that call worked out\", \"it was the wrong move\"), first search_entries to find its id, then update_entry with the review-only fields: reviewOutcome (what actually happened), reviewVerdict (Right call|Mixed|Wrong call|Too early to tell), wouldRepeat (Yes|No|Not sure), reviewLearning. Don't change the original decision text.",
-  "- When the user is simply capturing a thought, create ONE entry and STOP — do not connect, search, or create extras. Set done=true.",
+  "- CAPTURE MODE IS FOR SAVING. Any time the user states a thought, insight, decision, lesson, realization, observation, fact, or even a bare question, you MUST emit create_entry (one entry) — DO NOT just reply. A question the user shares is captured as a `question` entry, not answered. Then STOP (don't connect/search/create extras) and set done=true.",
+  "- NEVER reply that you captured, saved, filed, noted, created, or recorded something unless you actually emitted the matching create_entry/create_commitment action in the SAME response. No empty 'actions' with a 'Captured…' reply.",
   '- COMMITMENTS / REMINDERS: when the user wants to do something later, set a reminder, schedule a follow-up, or commit to a habit ("remind me to…", "I need to … by Friday", "every morning I want to…", "follow up on X next week"), use create_commitment with the natural-language due date. Don\'t also create an entry for a pure reminder. Set done=true.',
   "- Only connect_entries when the user explicitly asks to link things, and only with real ids from the context or a search result. NEVER invent ids or use a title as an id. If you don't have a real id, don't connect.",
   "- Do each write at most once. After your write actions, set done=true and give a short, friendly reply describing what you saved.",
@@ -458,4 +506,10 @@ function parseAgent(raw: string): ParsedAgent | null {
 /** True if a model reply is (broken) protocol JSON rather than a real message. */
 function looksLikeProtocol(raw: string): boolean {
   return /"\s*actions\s*"|"\s*tool\s*"/.test(raw);
+}
+
+/** True if the reply asserts it saved/filed something — used to catch the case
+ * where the model claims success without emitting the matching action. */
+function claimsCapture(reply: string): boolean {
+  return /\b(captured?|saved|filed|added|noted|logged|recorded|created|stored)\b/i.test(reply);
 }

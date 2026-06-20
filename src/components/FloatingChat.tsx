@@ -61,9 +61,12 @@ export function FloatingChat() {
   const [input, setInput] = useState("");
   const [images, setImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [attachOpen, setAttachOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const constraintsRef = useRef<HTMLDivElement>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
 
   // Draggable launcher position, remembered across reloads.
   const fabX = useMotionValue(0);
@@ -425,14 +428,73 @@ export function FloatingChat() {
                 )}
                 {/* One unified pill: attach · input · mic · send */}
                 <div className="flex items-end gap-1 rounded-[1.7rem] border border-white/10 bg-white/[0.06] py-1.5 pl-1.5 pr-2 focus-within:border-white/20">
-                  <label
-                    className="press grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-full text-zinc-300 hover:bg-white/10 hover:text-white"
-                    aria-label="Attach photo"
-                  >
-                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                      <path d="M12 5v14M5 12h14" />
-                    </svg>
+                  <div className="relative shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setAttachOpen((v) => !v)}
+                      aria-label="Add a photo"
+                      className="press grid h-9 w-9 place-items-center rounded-full text-zinc-300 hover:bg-white/10 hover:text-white"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        className={cn("h-5 w-5 transition-transform", attachOpen && "rotate-45")}
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      >
+                        <path d="M12 5v14M5 12h14" />
+                      </svg>
+                    </button>
+                    {attachOpen && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setAttachOpen(false)} />
+                        <div className="absolute bottom-11 left-0 z-20 w-44 overflow-hidden rounded-2xl border border-white/10 bg-zinc-900 shadow-xl">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              cameraRef.current?.click();
+                              setAttachOpen(false);
+                            }}
+                            className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-zinc-200 hover:bg-white/10"
+                          >
+                            <svg viewBox="0 0 24 24" className="h-5 w-5 text-zinc-400" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                              <circle cx="12" cy="13" r="4" />
+                            </svg>
+                            Take photo
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              galleryRef.current?.click();
+                              setAttachOpen(false);
+                            }}
+                            className="flex w-full items-center gap-3 border-t border-white/5 px-4 py-3 text-left text-sm text-zinc-200 hover:bg-white/10"
+                          >
+                            <svg viewBox="0 0 24 24" className="h-5 w-5 text-zinc-400" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="3" y="3" width="18" height="18" rx="2" />
+                              <circle cx="8.5" cy="8.5" r="1.5" />
+                              <path d="M21 15l-5-5L5 21" />
+                            </svg>
+                            Photo library
+                          </button>
+                        </div>
+                      </>
+                    )}
                     <input
+                      ref={cameraRef}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="hidden"
+                      onChange={(e) => {
+                        addImages(e.target.files);
+                        e.target.value = "";
+                      }}
+                    />
+                    <input
+                      ref={galleryRef}
                       type="file"
                       accept="image/*"
                       multiple
@@ -442,7 +504,7 @@ export function FloatingChat() {
                         e.target.value = "";
                       }}
                     />
-                  </label>
+                  </div>
                   <textarea
                     ref={taRef}
                     value={input}

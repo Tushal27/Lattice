@@ -105,12 +105,24 @@ export function MicButton({
       aria-pressed={listening}
       className={cn(
         "press relative grid place-items-center rounded-full transition-colors",
-        listening ? "bg-rose-500/90 text-white" : "border border-white/10 bg-white/5 text-zinc-300 hover:text-white",
+        listening ? "bg-rose-500/90 text-white" : "text-zinc-400 hover:bg-white/10 hover:text-zinc-200",
         className,
       )}
     >
       {listening && <span className="absolute inset-0 animate-ping rounded-full bg-rose-500/40" />}
-      <span className="relative text-base leading-none">🎤</span>
+      <svg
+        viewBox="0 0 24 24"
+        className="relative h-[18px] w-[18px]"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <rect x="9" y="2" width="6" height="12" rx="3" />
+        <path d="M5 10v2a7 7 0 0 0 14 0v-2" />
+        <line x1="12" y1="19" x2="12" y2="22" />
+      </svg>
     </button>
   );
 }
