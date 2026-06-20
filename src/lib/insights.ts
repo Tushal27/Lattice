@@ -133,26 +133,56 @@ async function computeCandidates(): Promise<InsightCandidate[]> {
     }
   }
 
-  // 7. Mistake warning: a brand-new entry echoing an older lesson (shared tags).
-  const oldLessons = entries.filter(
-    (e) => e.type === "lesson" && now - e.createdAt.getTime() > 30 * DAY && tagsOf(e).length > 0,
+  // 7. Mistake warning: a NEW entry that echoes a PRIOR lesson. Matches on shared
+  // tags AND overlapping words in title+summary (light stemming), so it catches
+  // e.g. "move to Postgres because app feels slow" vs the lesson "page slowness
+  // was app logic, not the database". The lesson only needs to predate the entry
+  // (no 30-day gate, which previously made this impossible to fire).
+  const STOP = new Set(
+    "the a an to of in on for and or but is was were be by not because with your you it this that move build use".split(" "),
   );
+  const stem = (w: string) => w.slice(0, 5);
+  const toks = (s: string) =>
+    new Set((s.toLowerCase().match(/[a-z]{3,}/g) ?? []).filter((w) => !STOP.has(w)).map(stem));
+  const jaccard = (a: Set<string>, b: Set<string>) => {
+    if (!a.size || !b.size) return 0;
+    let inter = 0;
+    for (const x of a) if (b.has(x)) inter++;
+    return inter / (a.size + b.size - inter);
+  };
+
+  const lessons = entries
+    .filter((e) => e.type === "lesson")
+    .map((l) => ({ l, tags: new Set(tagsOf(l)), tok: toks(`${l.title} ${l.summary ?? ""}`) }));
   const fresh = entries.filter((e) => now - e.createdAt.getTime() <= 7 * DAY && e.type !== "lesson");
+
   let warned = 0;
   for (const e of fresh) {
     if (warned >= 3) break;
     const eTags = new Set(tagsOf(e));
-    if (eTags.size === 0) continue;
-    const match = oldLessons.find((l) => tagsOf(l).filter((t) => eTags.has(t)).length >= 2);
-    if (match) {
+    const eTok = toks(`${e.title} ${e.summary ?? ""}`);
+    if (eTags.size === 0 && eTok.size === 0) continue;
+
+    let best: { l: (typeof entries)[number]; shared: number; text: number } | null = null;
+    for (const cand of lessons) {
+      if (cand.l.createdAt.getTime() >= e.createdAt.getTime()) continue; // must be prior knowledge
+      const shared = [...eTags].filter((t) => cand.tags.has(t)).length;
+      const text = jaccard(eTok, cand.tok);
+      if (!best || 2 * shared + 3 * text > 2 * best.shared + 3 * best.text) best = { l: cand.l, shared, text };
+    }
+
+    // Fire on a clear tag link, or a tag + some wording overlap, or strong wording.
+    const fires = best && (best.shared >= 2 || (best.shared >= 1 && best.text > 0.05) || best.text >= 0.4);
+    if (best && fires) {
       warned++;
+      const snippet = best.l.summary ? ` — “${best.l.summary.slice(0, 90)}”` : "";
       out.push({
-        key: `mistake:${e.id}`,
+        key: `mistake:${e.id}:${best.l.id}`,
         type: "MistakeWarning",
-        title: `Heads up — you've been here before`,
-        body: `“${e.title}” overlaps a past lesson: “${match.title}”. Worth a look before you repeat it.`,
-        entityId: match.id,
-        priority: 60,
+        title: "Heads up — you've been here before",
+        body: `“${e.title}” closely relates to a past lesson: “${best.l.title}”${snippet}. Re-check it before you act.`,
+        entityId: best.l.id,
+        priority: 70,
       });
     }
   }

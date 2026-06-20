@@ -23,18 +23,20 @@ export async function POST(request: Request) {
   const title = String(body.title ?? "").trim();
   if (!title) return Response.json({ error: "A title is required" }, { status: 400 });
 
-  // `due` may be a natural-language phrase ("tomorrow at 9") or an ISO date.
+  // `due` may be a natural-language phrase ("tomorrow at 9") or an ISO date,
+  // interpreted in the user's timezone (tz = client getTimezoneOffset()).
+  const tz = Number.isFinite(body.tz) ? Number(body.tz) : 0;
   const dueRaw = body.due ?? body.dueDate;
   const dueText = typeof dueRaw === "string" ? dueRaw : "";
   let dueDate =
-    dueRaw instanceof Date ? dueRaw : typeof dueRaw === "string" ? parseDueDate(dueRaw) : null;
+    dueRaw instanceof Date ? dueRaw : typeof dueRaw === "string" ? parseDueDate(dueRaw, new Date(), tz) : null;
   const recurringRule =
     (typeof body.recurringRule === "string" && body.recurringRule) ||
     parseRecurrence(dueText) ||
     parseRecurrence(title) ||
     null;
   // A recurring commitment with no explicit day gets a sensible first slot.
-  if (recurringRule && !dueDate) dueDate = seedRecurringDue(recurringRule, `${dueText} ${title}`);
+  if (recurringRule && !dueDate) dueDate = seedRecurringDue(recurringRule, `${dueText} ${title}`, new Date(), tz);
 
   const commitment = await createCommitment({
     title,

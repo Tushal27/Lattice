@@ -75,6 +75,7 @@ export function InsightFeed({ initial }: { initial: InsightDTO[] }) {
           due: "in 14 days",
           sourceType: "insight",
           sourceId: i.entityId,
+          tz: new Date().getTimezoneOffset(),
         }),
       });
       if (!res.ok) throw new Error();

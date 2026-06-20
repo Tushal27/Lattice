@@ -1,7 +1,7 @@
 import { runAgent, type AgentTurn } from "@/lib/agent";
 
 export async function POST(request: Request) {
-  let body: { message?: string; history?: AgentTurn[]; preserveRaw?: boolean; images?: string[] };
+  let body: { message?: string; history?: AgentTurn[]; preserveRaw?: boolean; images?: string[]; tz?: number };
   try {
     body = await request.json();
   } catch {
@@ -19,6 +19,7 @@ export async function POST(request: Request) {
   const result = await runAgent(fallbackMessage, history, {
     preserveRaw: body.preserveRaw !== false && Boolean(message),
     images,
+    tz: Number.isFinite(body.tz) ? Number(body.tz) : 0,
   });
   return Response.json(result);
 }

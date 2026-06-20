@@ -165,7 +165,7 @@ export function FloatingChat() {
         const res = await fetch("/api/agent", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message, history, preserveRaw: true, images: imgs }),
+          body: JSON.stringify({ message, history, preserveRaw: true, images: imgs, tz: new Date().getTimezoneOffset() }),
         });
         const data = await res.json();
         setMessages((m) => [
@@ -579,6 +579,7 @@ function SuggestionCard({ suggestion, onAdded }: { suggestion: Suggestion; onAdd
           due: suggestion.due,
           sourceType: suggestion.sourceType,
           sourceId: suggestion.sourceId,
+          tz: new Date().getTimezoneOffset(),
         }),
       });
       if (!res.ok) throw new Error();

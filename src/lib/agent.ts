@@ -70,7 +70,7 @@ const WRITE_TOOLS = new Set(["create_entry", "update_entry", "connect_entries", 
 export async function runAgent(
   message: string,
   history: AgentTurn[] = [],
-  opts: { preserveRaw?: boolean; images?: string[] } = {},
+  opts: { preserveRaw?: boolean; images?: string[]; tz?: number } = {},
 ): Promise<AgentResult> {
   if (!aiEnabled()) {
     return {
@@ -122,7 +122,7 @@ export async function runAgent(
         const t = String(action.args?.title ?? "").trim().toLowerCase();
         if (t && createdTitles.has(t)) continue;
       }
-      const step = await execute(action, { preserveRaw: opts.preserveRaw, rawText: message });
+      const step = await execute(action, { preserveRaw: opts.preserveRaw, rawText: message, tz: opts.tz });
       steps.push(step);
       if (step.ok && WRITE_TOOLS.has(action.tool)) {
         didWrite = true;
@@ -223,6 +223,7 @@ export async function runAgent(
 interface ExecOpts {
   preserveRaw?: boolean;
   rawText?: string;
+  tz?: number;
 }
 
 async function execute(
@@ -239,7 +240,7 @@ async function execute(
       case "connect_entries":
         return await connectTool(a);
       case "create_commitment":
-        return await commitmentTool(a);
+        return await commitmentTool(a, opts);
       case "search_entries":
         return await searchTool(a);
       case "get_entry":
@@ -328,17 +329,18 @@ async function connectTool(args: Record<string, unknown>): Promise<ExecutedStep>
   return { tool: "connect_entries", ok: true, summary: `Linked “${a.title}” ↔ “${b.title}”` };
 }
 
-async function commitmentTool(args: Record<string, unknown>): Promise<ExecutedStep> {
+async function commitmentTool(args: Record<string, unknown>, opts: ExecOpts = {}): Promise<ExecutedStep> {
+  const tz = opts.tz ?? 0;
   const title = String(args.title ?? "").trim();
   if (!title) return { tool: "create_commitment", ok: false, summary: "A commitment needs a title" };
   const dueRaw = args.due != null ? String(args.due) : null;
-  let dueDate = parseDueDate(dueRaw);
+  let dueDate = parseDueDate(dueRaw, new Date(), tz);
   const recurringRule =
     (args.recurring != null && String(args.recurring)) ||
     parseRecurrence(dueRaw) ||
     parseRecurrence(title) ||
     null;
-  if (recurringRule && !dueDate) dueDate = seedRecurringDue(recurringRule, `${dueRaw ?? ""} ${title}`);
+  if (recurringRule && !dueDate) dueDate = seedRecurringDue(recurringRule, `${dueRaw ?? ""} ${title}`, new Date(), tz);
   const c = await createCommitment({
     title,
     description: args.note != null ? String(args.note) : null,
@@ -491,6 +493,7 @@ const AGENT_SYSTEM = [
   "- CAPTURE MODE IS FOR SAVING. Any time the user states a thought, insight, decision, lesson, realization, observation, fact, or even a bare question, you MUST emit create_entry (one entry) — DO NOT just reply. A question the user shares is captured as a `question` entry, not answered. Then STOP (don't connect/search/create extras) and set done=true.",
   "- NEVER reply that you captured, saved, filed, noted, created, or recorded something unless you actually emitted the matching create_entry/create_commitment action in the SAME response. No empty 'actions' with a 'Captured…' reply.",
   '- COMMITMENTS / REMINDERS: when the user wants to do something later, set a reminder, schedule a follow-up, or commit to a habit ("remind me to…", "I need to … by Friday", "every morning I want to…", "follow up on X next week"), use create_commitment with the natural-language due date. Don\'t also create an entry for a pure reminder. Set done=true.',
+  '- LIST OF TASKS: if the user gives several things to do / a to-do or task list (numbered or bulleted, e.g. "tasks for the next 10 days: 1… 2… 3…"), emit ONE create_commitment per item in the SAME response (spread the due dates across the stated window if implied). Never reply that you "set commitments/reminders" without actually emitting those create_commitment actions.',
   "- Only connect_entries when the user explicitly asks to link things, and only with real ids from the context or a search result. NEVER invent ids or use a title as an id. If you don't have a real id, don't connect.",
   "- Do each write at most once. After your write actions, set done=true and give a short, friendly reply describing what you saved.",
   "- If the user is just chatting or asking about their data, use read tools or none, answer in `reply`, and set done=true.",
@@ -532,8 +535,13 @@ function looksLikeProtocol(raw: string): boolean {
   return /"\s*actions\s*"|"\s*tool\s*"/.test(raw);
 }
 
-/** True if the reply asserts it saved/filed something — used to catch the case
- * where the model claims success without emitting the matching action. */
+/** True if the reply asserts it saved/filed/scheduled something — used to catch
+ * the case where the model claims success without emitting the matching action
+ * (entries OR commitments). */
 function claimsCapture(reply: string): boolean {
-  return /\b(captured?|saved|filed|added|noted|logged|recorded|created|stored)\b/i.test(reply);
+  if (/\b(captured?|saved|filed|added|noted|logged|recorded|created|stored|scheduled|committed)\b/i.test(reply)) {
+    return true;
+  }
+  // "I've set commitments / a reminder / the tasks…"
+  return /\bset\b[\s\S]*\b(reminder|commitment|task)s?\b/i.test(reply);
 }

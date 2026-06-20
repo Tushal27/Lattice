@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "@/components/Toast";
 import { cn } from "@/lib/utils";
@@ -15,8 +16,15 @@ export interface CommitmentDTO {
   recurringRule: string | null;
   priority: string | null;
   sourceType: string | null;
+  sourceId: string | null;
   createdAt: string;
 }
+
+const HARVEST_TYPES = [
+  { key: "lesson", icon: "🎓", label: "Lesson" },
+  { key: "aha", icon: "💡", label: "Aha" },
+  { key: "question", icon: "❓", label: "Question" },
+];
 
 interface Groups {
   overdue: CommitmentDTO[];
@@ -56,11 +64,61 @@ const PRIORITY_DOT: Record<string, string> = {
 };
 
 export function CommitmentList({ initial, review }: { initial: Groups; review: Review }) {
+  const router = useRouter();
   const [groups, setGroups] = useState<Groups>(initial);
   const [busy, setBusy] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [due, setDue] = useState("");
   const [adding, setAdding] = useState(false);
+
+  // "Harvest" prompt shown when completing — capture what you took from it.
+  const [harvest, setHarvest] = useState<{ id: string; title: string; sourceId: string | null } | null>(null);
+  const [hType, setHType] = useState("lesson");
+  const [hText, setHText] = useState("");
+  const [hBusy, setHBusy] = useState(false);
+
+  function openComplete(c: CommitmentDTO) {
+    setHType("lesson");
+    setHText("");
+    setHarvest({ id: c.id, title: c.title, sourceId: c.sourceId });
+  }
+
+  async function finishComplete(withEntry: boolean) {
+    if (!harvest || hBusy) return;
+    setHBusy(true);
+    const text = hText.trim();
+    try {
+      if (withEntry && text) {
+        const entryTitle = text.length > 70 ? text.slice(0, 67).trimEnd() + "…" : text;
+        const res = await fetch("/api/entries", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: hType, title: entryTitle, summary: entryTitle, details: text }),
+        });
+        if (res.ok && harvest.sourceId) {
+          const entry = await res.json();
+          await fetch("/api/connections", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fromId: entry.id, toId: harvest.sourceId, note: "captured on completing a commitment" }),
+          }).catch(() => {});
+        }
+      }
+      await fetch(`/api/commitments/${harvest.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "complete" }),
+      });
+      toast(withEntry && text ? "Saved & completed ✓" : "Done — nice.");
+      setHarvest(null);
+      await refresh();
+      router.refresh();
+    } catch {
+      toast("Couldn't complete that", "error");
+    } finally {
+      setHBusy(false);
+    }
+  }
 
   async function refresh() {
     const res = await fetch("/api/commitments");
@@ -111,7 +169,7 @@ export function CommitmentList({ initial, review }: { initial: Groups; review: R
       const res = await fetch("/api/commitments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: t, due: due.trim() || null }),
+        body: JSON.stringify({ title: t, due: due.trim() || null, tz: new Date().getTimezoneOffset() }),
       });
       if (!res.ok) throw new Error();
       setTitle("");
@@ -183,9 +241,9 @@ export function CommitmentList({ initial, review }: { initial: Groups; review: R
         </div>
       )}
 
-      <Section title="Overdue" tone="rose" items={groups.overdue} busy={busy} onAct={act} onRemove={remove} />
-      <Section title="Today" tone="emerald" items={groups.today} busy={busy} onAct={act} onRemove={remove} />
-      <Section title="Upcoming" tone="zinc" items={groups.upcoming} busy={busy} onAct={act} onRemove={remove} />
+      <Section title="Overdue" tone="rose" items={groups.overdue} busy={busy} onAct={act} onComplete={openComplete} onRemove={remove} />
+      <Section title="Today" tone="emerald" items={groups.today} busy={busy} onAct={act} onComplete={openComplete} onRemove={remove} />
+      <Section title="Upcoming" tone="zinc" items={groups.upcoming} busy={busy} onAct={act} onComplete={openComplete} onRemove={remove} />
 
       {groups.done.length > 0 && (
         <section>
@@ -203,6 +261,73 @@ export function CommitmentList({ initial, review }: { initial: Groups; review: R
           </div>
         </section>
       )}
+
+      {/* Harvest prompt on completion */}
+      <AnimatePresence>
+        {harvest && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 p-4 backdrop-blur-sm sm:items-center"
+            onClick={() => !hBusy && setHarvest(null)}
+          >
+            <motion.div
+              initial={{ y: 24, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 24, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md rounded-2xl border border-white/10 bg-zinc-900 p-5"
+            >
+              <h3 className="text-base font-semibold text-zinc-100">Nice — what did you take from it?</h3>
+              <p className="mt-1 truncate text-xs text-zinc-500">“{harvest.title}”</p>
+
+              <div className="mt-4 flex gap-2">
+                {HARVEST_TYPES.map((t) => (
+                  <button
+                    key={t.key}
+                    onClick={() => setHType(t.key)}
+                    className={cn(
+                      "flex-1 rounded-xl border px-3 py-2 text-sm transition-colors",
+                      hType === t.key
+                        ? "border-violet-400/50 bg-violet-500/15 text-violet-100"
+                        : "border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10",
+                    )}
+                  >
+                    {t.icon} {t.label}
+                  </button>
+                ))}
+              </div>
+
+              <textarea
+                value={hText}
+                onChange={(e) => setHText(e.target.value)}
+                rows={3}
+                autoFocus
+                placeholder="What did you learn, realize, or want to explore next? (optional)"
+                className="mt-3 w-full resize-none rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-violet-400/50 focus:outline-none"
+              />
+
+              <div className="mt-4 flex gap-2">
+                <button
+                  onClick={() => finishComplete(false)}
+                  disabled={hBusy}
+                  className="press flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-zinc-200 hover:bg-white/10 disabled:opacity-50"
+                >
+                  Just complete
+                </button>
+                <button
+                  onClick={() => finishComplete(true)}
+                  disabled={hBusy || !hText.trim()}
+                  className="press flex-1 rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-40"
+                >
+                  Save &amp; complete
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -233,6 +358,7 @@ function Section({
   items,
   busy,
   onAct,
+  onComplete,
   onRemove,
 }: {
   title: string;
@@ -240,6 +366,7 @@ function Section({
   items: CommitmentDTO[];
   busy: string | null;
   onAct: (id: string, action: "complete" | "snooze" | "cancel") => void;
+  onComplete: (c: CommitmentDTO) => void;
   onRemove: (id: string) => void;
 }) {
   if (items.length === 0) return null;
@@ -260,7 +387,7 @@ function Section({
               className={cn("flex items-center gap-3 rounded-xl border p-3.5", TONE[tone])}
             >
               <button
-                onClick={() => onAct(c.id, "complete")}
+                onClick={() => onComplete(c)}
                 disabled={busy === c.id}
                 aria-label="Mark done"
                 className="press grid h-6 w-6 shrink-0 place-items-center rounded-full border border-white/20 text-transparent transition-colors hover:border-emerald-400 hover:text-emerald-400"

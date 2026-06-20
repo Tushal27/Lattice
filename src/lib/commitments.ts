@@ -8,14 +8,25 @@ const MONTHS = [
   "july", "august", "september", "october", "november", "december",
 ];
 
-/** Apply a time-of-day phrase to a date, defaulting to 9am. Returns false if none found. */
+// All "wall clock" parsing happens in the user's timezone, passed as `tz` =
+// the client's Date.getTimezoneOffset() in minutes (UTC=0, IST=-330). The server
+// runs in UTC, so without this "10am" would be stored as 10:00 UTC and shown as
+// 15:30 in IST. We shift `now` into a frame whose UTC fields equal the user's
+// wall clock, do the math with UTC methods, then shift back to a real instant.
+function toLocalFrame(now: Date, tz: number): Date {
+  return new Date(now.getTime() - tz * 60000);
+}
+function toInstant(local: Date, tz: number): Date {
+  return new Date(local.getTime() + tz * 60000);
+}
+
+/** Apply a time-of-day phrase to a local-frame date (UTC fields = wall clock). */
 function applyTime(d: Date, text: string): boolean {
-  // "at 9", "9am", "9:30pm", "17:00", "noon", "midnight", "morning", "evening"
-  if (/\bnoon\b/.test(text)) { d.setHours(12, 0, 0, 0); return true; }
-  if (/\bmidnight\b/.test(text)) { d.setHours(0, 0, 0, 0); return true; }
-  if (/\bmorning\b/.test(text)) { d.setHours(9, 0, 0, 0); return true; }
-  if (/\b(after ?noon)\b/.test(text)) { d.setHours(14, 0, 0, 0); return true; }
-  if (/\b(evening|tonight)\b/.test(text)) { d.setHours(19, 0, 0, 0); return true; }
+  if (/\bnoon\b/.test(text)) { d.setUTCHours(12, 0, 0, 0); return true; }
+  if (/\bmidnight\b/.test(text)) { d.setUTCHours(0, 0, 0, 0); return true; }
+  if (/\bmorning\b/.test(text)) { d.setUTCHours(9, 0, 0, 0); return true; }
+  if (/\bafter ?noon\b/.test(text)) { d.setUTCHours(14, 0, 0, 0); return true; }
+  if (/\b(evening|tonight|night)\b/.test(text)) { d.setUTCHours(19, 0, 0, 0); return true; }
   const m = text.match(/\b(?:at\s*)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/);
   if (m && (m[3] || /\bat\b/.test(text))) {
     let hr = parseInt(m[1], 10);
@@ -23,7 +34,7 @@ function applyTime(d: Date, text: string): boolean {
     if (hr <= 23) {
       if (m[3] === "pm" && hr < 12) hr += 12;
       if (m[3] === "am" && hr === 12) hr = 0;
-      d.setHours(hr, min, 0, 0);
+      d.setUTCHours(hr, min, 0, 0);
       return true;
     }
   }
@@ -31,62 +42,66 @@ function applyTime(d: Date, text: string): boolean {
 }
 
 /**
- * Parse a natural-language (or ISO) due phrase into a Date. Returns null when
- * nothing date-like is found, so the caller can leave a commitment undated.
- * Used by both the API and the agent's create_commitment tool.
+ * Parse a natural-language (or ISO) due phrase into a Date, interpreted in the
+ * user's timezone. Returns null when nothing date/time-like is found.
  */
-export function parseDueDate(input: string | null | undefined, now = new Date()): Date | null {
+export function parseDueDate(input: string | null | undefined, now = new Date(), tz = 0): Date | null {
   if (!input) return null;
   const text = input.toLowerCase().trim();
   if (!text) return null;
 
+  const base = toLocalFrame(now, tz);
+  const done = (d: Date) => toInstant(d, tz);
+  const startOf = (d: Date) => {
+    if (!applyTime(d, text)) d.setUTCHours(9, 0, 0, 0);
+    return done(d);
+  };
+
   // ISO date (optionally with time): 2026-06-25 or 2026-06-25T14:00
   const iso = text.match(/\b(\d{4})-(\d{2})-(\d{2})(?:[t ](\d{2}):(\d{2}))?\b/);
   if (iso) {
-    const d = new Date(now);
-    d.setFullYear(+iso[1], +iso[2] - 1, +iso[3]);
-    if (iso[4]) d.setHours(+iso[4], +iso[5], 0, 0);
-    else if (!applyTime(d, text)) d.setHours(9, 0, 0, 0);
-    return d;
+    const d = new Date(base);
+    d.setUTCFullYear(+iso[1], +iso[2] - 1, +iso[3]);
+    if (iso[4]) {
+      d.setUTCHours(+iso[4], +iso[5], 0, 0);
+      return done(d);
+    }
+    if (!applyTime(d, text)) d.setUTCHours(9, 0, 0, 0);
+    return done(d);
   }
 
-  const startOf = (d: Date) => { if (!applyTime(d, text)) d.setHours(9, 0, 0, 0); return d; };
-
-  if (/\b(today|tonight)\b/.test(text)) return startOf(new Date(now));
-  if (/\btomorrow\b/.test(text)) { const d = new Date(now); d.setDate(d.getDate() + 1); return startOf(d); }
-  if (/\bday after tomorrow\b/.test(text)) { const d = new Date(now); d.setDate(d.getDate() + 2); return startOf(d); }
+  if (/\b(today|tonight)\b/.test(text)) return startOf(new Date(base));
+  if (/\btomorrow\b/.test(text)) { const d = new Date(base); d.setUTCDate(d.getUTCDate() + 1); return startOf(d); }
+  if (/\bday after tomorrow\b/.test(text)) { const d = new Date(base); d.setUTCDate(d.getUTCDate() + 2); return startOf(d); }
 
   // "in 3 days", "in 2 weeks", "in a month"
   const rel = text.match(/\bin\s+(a|an|\d+)\s+(day|week|month|year)s?\b/);
   if (rel) {
     const n = rel[1] === "a" || rel[1] === "an" ? 1 : parseInt(rel[1], 10);
-    const d = new Date(now);
-    if (rel[2] === "day") d.setDate(d.getDate() + n);
-    else if (rel[2] === "week") d.setDate(d.getDate() + n * 7);
-    else if (rel[2] === "month") d.setMonth(d.getMonth() + n);
-    else d.setFullYear(d.getFullYear() + n);
+    const d = new Date(base);
+    if (rel[2] === "day") d.setUTCDate(d.getUTCDate() + n);
+    else if (rel[2] === "week") d.setUTCDate(d.getUTCDate() + n * 7);
+    else if (rel[2] === "month") d.setUTCMonth(d.getUTCMonth() + n);
+    else d.setUTCFullYear(d.getUTCFullYear() + n);
     return startOf(d);
   }
 
-  if (/\bnext week\b/.test(text)) { const d = new Date(now); d.setDate(d.getDate() + 7); return startOf(d); }
-  if (/\bnext month\b/.test(text)) { const d = new Date(now); d.setMonth(d.getMonth() + 1); return startOf(d); }
+  if (/\bnext week\b/.test(text)) { const d = new Date(base); d.setUTCDate(d.getUTCDate() + 7); return startOf(d); }
+  if (/\bnext month\b/.test(text)) { const d = new Date(base); d.setUTCMonth(d.getUTCMonth() + 1); return startOf(d); }
   if (/\b(this )?weekend\b/.test(text)) {
-    const d = new Date(now);
-    const day = d.getDay();
-    const add = (6 - day + 7) % 7 || 6; // upcoming Saturday
-    d.setDate(d.getDate() + add);
+    const d = new Date(base);
+    const add = (6 - d.getUTCDay() + 7) % 7 || 6; // upcoming Saturday
+    d.setUTCDate(d.getUTCDate() + add);
     return startOf(d);
   }
 
   // weekday name: "monday", "next friday"
   for (let i = 0; i < WEEKDAYS.length; i++) {
     if (new RegExp(`\\b${WEEKDAYS[i]}\\b`).test(text)) {
-      const d = new Date(now);
-      const isNext = /\bnext\b/.test(text);
-      let add = (i - d.getDay() + 7) % 7;
+      const d = new Date(base);
+      let add = (i - d.getUTCDay() + 7) % 7;
       if (add === 0) add = 7; // always future
-      if (isNext && add <= 7) add += 0; // "next monday" ~ the coming monday already future
-      d.setDate(d.getDate() + add);
+      d.setUTCDate(d.getUTCDate() + add);
       return startOf(d);
     }
   }
@@ -99,11 +114,18 @@ export function parseDueDate(input: string | null | undefined, now = new Date())
     const mm = text.match(re);
     if (mm) {
       const dayNum = parseInt(mm[1] || mm[2], 10);
-      const d = new Date(now);
-      d.setMonth(i, dayNum);
-      if (d < now) d.setFullYear(d.getFullYear() + 1);
+      const d = new Date(base);
+      d.setUTCMonth(i, dayNum);
+      if (d.getTime() < base.getTime()) d.setUTCFullYear(d.getUTCFullYear() + 1);
       return startOf(d);
     }
+  }
+
+  // Time only ("at 10am", "9pm") with no date word → today, or tomorrow if past.
+  const probe = new Date(base);
+  if (applyTime(probe, text)) {
+    if (probe.getTime() <= base.getTime()) probe.setUTCDate(probe.getUTCDate() + 1);
+    return done(probe);
   }
 
   return null;
@@ -123,19 +145,18 @@ export function parseRecurrence(input: string | null | undefined): string | null
 }
 
 /**
- * The first due date for a recurring commitment that the user didn't pin to a
- * specific day — e.g. "every morning" → today at 9am (or tomorrow if past).
+ * First due date for a recurring commitment with no explicit day — e.g.
+ * "every morning" → today at 9am local (or the next occurrence if already past).
  */
-export function seedRecurringDue(rule: string, text: string, now = new Date()): Date {
-  const d = new Date(now);
+export function seedRecurringDue(rule: string, text: string, now = new Date(), tz = 0): Date {
+  const d = toLocalFrame(now, tz);
   if (!applyTime(d, text)) {
-    // sensible default times by phrasing
-    if (/\b(evening|night)\b/.test(text.toLowerCase())) d.setHours(19, 0, 0, 0);
-    else d.setHours(9, 0, 0, 0);
+    if (/\b(evening|night)\b/.test(text.toLowerCase())) d.setUTCHours(19, 0, 0, 0);
+    else d.setUTCHours(9, 0, 0, 0);
   }
-  // If today's slot already passed, start at the next occurrence.
-  if (d < now) return nextOccurrence(rule, d);
-  return d;
+  const instant = toInstant(d, tz);
+  if (instant.getTime() < now.getTime()) return nextOccurrence(rule, instant);
+  return instant;
 }
 
 export interface CommitmentInput {
