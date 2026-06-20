@@ -1,7 +1,7 @@
 import { runAgent, type AgentTurn } from "@/lib/agent";
 
 export async function POST(request: Request) {
-  let body: { message?: string; history?: AgentTurn[]; preserveRaw?: boolean };
+  let body: { message?: string; history?: AgentTurn[]; preserveRaw?: boolean; images?: string[] };
   try {
     body = await request.json();
   } catch {
@@ -9,9 +9,16 @@ export async function POST(request: Request) {
   }
 
   const message = String(body.message ?? "").trim();
-  if (!message) return Response.json({ error: "message required" }, { status: 400 });
+  const images = Array.isArray(body.images) ? body.images.slice(0, 4) : [];
+  if (!message && images.length === 0) {
+    return Response.json({ error: "message or image required" }, { status: 400 });
+  }
 
   const history = Array.isArray(body.history) ? body.history.slice(-8) : [];
-  const result = await runAgent(message, history, { preserveRaw: body.preserveRaw !== false });
+  const fallbackMessage = message || "Capture what's in the attached image.";
+  const result = await runAgent(fallbackMessage, history, {
+    preserveRaw: body.preserveRaw !== false && Boolean(message),
+    images,
+  });
   return Response.json(result);
 }

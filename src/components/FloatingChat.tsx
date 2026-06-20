@@ -8,6 +8,7 @@ import { Markdown } from "@/components/Markdown";
 import { MicButton } from "@/components/MicButton";
 import { TYPES, type EntryType } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { compressImage } from "@/lib/image";
 
 type Mode = "wonder" | "capture";
 
@@ -28,6 +29,7 @@ interface Msg {
   provider?: string;
   steps?: Step[];
   saved?: boolean;
+  images?: string[];
 }
 
 const SUGGESTIONS: Record<Mode, string[]> = {
@@ -52,6 +54,7 @@ export function FloatingChat() {
   const [mode, setMode] = useState<Mode>("capture");
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
+  const [images, setImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const constraintsRef = useRef<HTMLDivElement>(null);
@@ -112,21 +115,30 @@ export function FloatingChat() {
     el.style.height = Math.min(el.scrollHeight, 160) + "px";
   }, [input, open]);
 
+  async function addImages(files: FileList | null) {
+    if (!files) return;
+    const picked = Array.from(files).slice(0, 4 - images.length);
+    const compressed = await Promise.all(picked.map((f) => compressImage(f).catch(() => null)));
+    setImages((prev) => [...prev, ...(compressed.filter(Boolean) as string[])].slice(0, 4));
+  }
+
   async function send(text: string) {
     const message = text.trim();
-    if (!message || loading) return;
+    const imgs = images;
+    if ((!message && imgs.length === 0) || loading) return;
     window.dispatchEvent(new CustomEvent("lattice:stt-stop"));
     const here = mode;
     const history = messages.map((m) => ({ role: m.role, text: m.text }));
-    setMessages((m) => [...m, { role: "you", text: message }]);
+    setMessages((m) => [...m, { role: "you", text: message || (imgs.length ? "📷 (image)" : ""), images: imgs }]);
     setInput("");
+    setImages([]);
     setLoading(true);
     try {
       if (here === "wonder") {
         const res = await fetch("/api/ai", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ task: "ask", message, history }),
+          body: JSON.stringify({ task: "ask", message, history, images: imgs }),
         });
         const data = await res.json();
         setMessages((m) => [
@@ -137,7 +149,7 @@ export function FloatingChat() {
         const res = await fetch("/api/agent", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message, history, preserveRaw: true }),
+          body: JSON.stringify({ message, history, preserveRaw: true, images: imgs }),
         });
         const data = await res.json();
         setMessages((m) => [
@@ -315,6 +327,14 @@ export function FloatingChat() {
                             : "max-w-[88%] rounded-2xl rounded-bl-md border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-zinc-100"
                         }
                       >
+                        {m.images && m.images.length > 0 && (
+                          <div className="mb-2 flex flex-wrap gap-1.5">
+                            {m.images.map((src, k) => (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img key={k} src={src} alt="attachment" className="h-16 w-16 rounded-lg object-cover" />
+                            ))}
+                          </div>
+                        )}
                         {m.role === "ai" ? <Markdown>{m.text}</Markdown> : m.text}
                       </div>
                     </div>
@@ -369,7 +389,41 @@ export function FloatingChat() {
               }}
               className="border-t border-white/10"
             >
+              {images.length > 0 && (
+                <div className="mx-auto flex w-full max-w-2xl flex-wrap gap-2 px-4 pt-3">
+                  {images.map((src, k) => (
+                    <div key={k} className="relative">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={src} alt="attachment" className="h-14 w-14 rounded-lg object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setImages((prev) => prev.filter((_, idx) => idx !== k))}
+                        className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-zinc-900 text-xs text-zinc-300 ring-1 ring-white/20"
+                        aria-label="Remove image"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="mx-auto flex w-full max-w-2xl items-end gap-2 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                <label
+                  className="press grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-full border border-white/10 bg-white/5 text-lg text-zinc-300 hover:text-white"
+                  aria-label="Attach photo"
+                >
+                  📷
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      addImages(e.target.files);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
                 <textarea
                   ref={taRef}
                   value={input}
@@ -393,7 +447,7 @@ export function FloatingChat() {
                 <MicButton value={input} onChange={setInput} className="h-10 w-10 shrink-0" />
                 <button
                   type="submit"
-                  disabled={loading || !input.trim()}
+                  disabled={loading || (!input.trim() && images.length === 0)}
                   className="press grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-violet-500 to-sky-600 text-white disabled:opacity-40"
                   aria-label="Send"
                 >

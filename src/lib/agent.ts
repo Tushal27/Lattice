@@ -59,7 +59,7 @@ const WRITE_TOOLS = new Set(["create_entry", "update_entry", "connect_entries"])
 export async function runAgent(
   message: string,
   history: AgentTurn[] = [],
-  opts: { preserveRaw?: boolean } = {},
+  opts: { preserveRaw?: boolean; images?: string[] } = {},
 ): Promise<AgentResult> {
   if (!aiEnabled()) {
     return {
@@ -80,7 +80,13 @@ export async function runAgent(
 
   for (let i = 0; i < MAX_STEPS; i++) {
     const prompt = buildPrompt(context, history, message, steps, readResults);
-    const res = await generateDetailed(prompt, { system: AGENT_SYSTEM, temperature: 0.3 });
+    // Send any attached images only on the first step (the model reads them to
+    // decide what to capture); later reasoning steps don't need to resend them.
+    const res = await generateDetailed(prompt, {
+      system: AGENT_SYSTEM,
+      temperature: 0.3,
+      images: i === 0 ? opts.images : undefined,
+    });
     if (!res) {
       reply = reply || "I couldn't reach the AI engine just now — please try again.";
       break;
@@ -368,6 +374,7 @@ const AGENT_SYSTEM = [
   typeSchema(),
   "",
   "Rules:",
+  "- IF AN IMAGE IS ATTACHED: read everything in it (handwriting, whiteboard, screenshot, book page, diagram), transcribe the meaningful content, and capture it as the best-fit entry — keep the real text/details. If the user added a caption, treat it as guidance.",
   "- PRESERVE MEANING, don't crush it. Write a strong, specific title and a one-line summary, and fill the structured fields with the real specifics (lists, names, numbers).",
   "- You do NOT need to copy the user's entire message verbatim — the system automatically keeps their full original text in `details`. Focus on a great title, summary, type, and tags. For very long pastes, keep your JSON compact.",
   "- For a big dump (work log, brain dump), prefer creating ONE rich entry that keeps it all rather than several thin ones, unless the user clearly lists separate items.",

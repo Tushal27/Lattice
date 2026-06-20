@@ -144,6 +144,8 @@ export function configuredProviders(): string[] {
 interface GenerateOptions {
   system?: string;
   temperature?: number;
+  /** Base64 data URLs (e.g. data:image/jpeg;base64,…) for vision-capable models. */
+  images?: string[];
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -192,10 +194,19 @@ async function callOpenAI(
   prompt: string,
   opts: GenerateOptions,
 ): Promise<string | null> {
+  const userContent =
+    opts.images && opts.images.length > 0
+      ? [
+          { type: "text", text: prompt },
+          ...opts.images.map((url) => ({ type: "image_url", image_url: { url } })),
+        ]
+      : prompt;
   const messages = [
     ...(opts.system ? [{ role: "system", content: opts.system }] : []),
-    { role: "user", content: prompt },
+    { role: "user", content: userContent },
   ];
+  // Vision payloads can be larger/slower than text — give them more time.
+  const timeout = opts.images && opts.images.length ? 60_000 : 30_000;
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -204,7 +215,7 @@ async function callOpenAI(
       ...(spec.headers?.() ?? {}),
     },
     body: JSON.stringify({ model, messages, temperature: opts.temperature ?? 0.7 }),
-    signal: AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(timeout),
   });
   if (!res.ok) {
     console.warn(`${spec.name} ${res.status}`, await res.text().catch(() => ""));
@@ -221,15 +232,21 @@ async function callGemini(
   opts: GenerateOptions,
 ): Promise<string | null> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+  const parts: Array<Record<string, unknown>> = [{ text: prompt }];
+  for (const u of opts.images ?? []) {
+    const comma = u.indexOf(",");
+    const mime = u.slice(5, u.indexOf(";")) || "image/jpeg";
+    parts.push({ inline_data: { mime_type: mime, data: u.slice(comma + 1) } });
+  }
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       ...(opts.system ? { systemInstruction: { parts: [{ text: opts.system }] } } : {}),
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      contents: [{ role: "user", parts }],
       generationConfig: { temperature: opts.temperature ?? 0.7 },
     }),
-    signal: AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(opts.images && opts.images.length ? 60_000 : 30_000),
   });
   if (!res.ok) {
     console.warn(`gemini ${res.status}`, await res.text().catch(() => ""));

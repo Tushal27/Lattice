@@ -21,11 +21,12 @@ export async function POST(request: Request) {
     }
     case "ask": {
       const message = String(body.message ?? "").trim();
-      if (!message) return Response.json({ error: "message required" }, { status: 400 });
+      const images = Array.isArray(body.images) ? (body.images as string[]).slice(0, 4) : [];
+      if (!message && images.length === 0) return Response.json({ error: "message required" }, { status: 400 });
       const history = Array.isArray(body.history)
         ? (body.history as { role: string; text: string }[]).slice(-10)
         : [];
-      return Response.json(await askPartner(message, history));
+      return Response.json(await askPartner(message, history, images));
     }
     case "classify": {
       const text = String(body.text ?? "").trim();

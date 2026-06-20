@@ -319,6 +319,7 @@ export async function quizBatch(items: QuizItem[]): Promise<Record<string, strin
 export async function askPartner(
   message: string,
   history: { role: string; text: string }[] = [],
+  images: string[] = [],
 ): Promise<SourcedText & { provider?: string }> {
   const recent = await listEntries({ limit: 150 });
   const convo = history
@@ -330,13 +331,16 @@ export async function askPartner(
     digest(recent),
     "",
     ...(convo ? ["Our conversation so far:", convo, ""] : []),
+    images.length ? "(I've attached an image — read it and factor it into your reply.)" : "",
     "My new message:",
-    message,
+    message || "(see attached image)",
     "",
     "Reply as a continuation of our conversation — keep the thread, don't restart.",
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 
-  const ai = await generateDetailed(prompt, { system: THINKING_PARTNER_SYSTEM, temperature: 0.8 });
+  const ai = await generateDetailed(prompt, { system: THINKING_PARTNER_SYSTEM, temperature: 0.8, images });
   if (ai) return { source: "ai", text: ai.text, provider: ai.provider };
 
   return {
