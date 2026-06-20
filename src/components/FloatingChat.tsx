@@ -270,13 +270,28 @@ export function FloatingChat() {
                     </div>
                   </div>
                 </div>
-                <button
-                  onClick={() => setOpen(false)}
-                  className="press grid h-9 w-9 place-items-center rounded-full text-zinc-400 hover:bg-white/10 hover:text-zinc-100"
-                  aria-label="Close"
-                >
-                  ✕
-                </button>
+                <div className="flex items-center gap-1">
+                  {messages.length > 0 && (
+                    <button
+                      onClick={() => setMessages([])}
+                      className="press grid h-9 w-9 place-items-center rounded-full text-zinc-400 hover:bg-white/10 hover:text-zinc-100"
+                      aria-label="New chat"
+                      title="New chat"
+                    >
+                      <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                      </svg>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setOpen(false)}
+                    className="press grid h-9 w-9 place-items-center rounded-full text-zinc-400 hover:bg-white/10 hover:text-zinc-100"
+                    aria-label="Close"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
               {/* Mode toggle */}
               <div className="mx-auto flex w-full max-w-2xl gap-1 px-4 pb-2">
@@ -297,7 +312,7 @@ export function FloatingChat() {
 
             {/* Messages */}
             <div ref={scrollRef} className="flex-1 overflow-y-auto">
-              <div className="mx-auto w-full max-w-2xl space-y-3 px-4 py-5">
+              <div className="mx-auto w-full max-w-2xl space-y-5 px-4 py-5">
                 {messages.length === 0 && (
                   <div className="pt-8 text-center">
                     <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-violet-500/20 to-sky-500/20 text-2xl">
@@ -324,48 +339,45 @@ export function FloatingChat() {
 
                 {messages.map((m, i) => (
                   <motion.div key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-                    <div className={m.role === "you" ? "flex justify-end" : "flex justify-start"}>
-                      <div
-                        className={
-                          m.role === "you"
-                            ? "max-w-[82%] rounded-2xl rounded-br-md bg-gradient-to-br from-violet-600 to-violet-700 px-4 py-2.5 text-sm text-white"
-                            : "max-w-[88%] rounded-2xl rounded-bl-md border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-zinc-100"
-                        }
-                      >
-                        {m.images && m.images.length > 0 && (
-                          <div className="mb-2 flex flex-wrap gap-1.5">
-                            {m.images.map((src, k) => (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img key={k} src={src} alt="attachment" className="h-16 w-16 rounded-lg object-cover" />
-                            ))}
-                          </div>
-                        )}
-                        {m.role === "ai" ? <Markdown>{m.text}</Markdown> : m.text}
-                      </div>
-                    </div>
-
-                    {m.role === "ai" && m.steps && (
-                      <div className="mt-2 flex flex-col gap-1.5">
-                        {m.steps
-                          .filter((s) => WRITE_TOOLS.has(s.tool))
-                          .map((s, j) => (
-                            <ActionCard key={j} step={s} onNavigate={() => setOpen(false)} />
-                          ))}
+                    {m.images && m.images.length > 0 && (
+                      <div className={cn("mb-2 flex flex-wrap gap-1.5", m.role === "you" && "justify-end")}>
+                        {m.images.map((src, k) => (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img key={k} src={src} alt="attachment" className="h-20 w-20 rounded-xl object-cover" />
+                        ))}
                       </div>
                     )}
 
-                    {m.role === "ai" && m.mode === "wonder" && m.source === "ai" && (
-                      <div className="mt-2">
-                        {m.saved ? (
-                          <span className="text-[11px] text-emerald-300">✓ saved</span>
-                        ) : (
-                          <button
-                            onClick={() => saveThis(i)}
-                            disabled={loading}
-                            className="press rounded-full border border-violet-400/30 bg-violet-500/10 px-3 py-1 text-xs text-violet-200 hover:bg-violet-500/20 disabled:opacity-50"
-                          >
-                            ✦ Save this as an entry
-                          </button>
+                    {m.role === "you" ? (
+                      <div className="flex justify-end">
+                        <div className="max-w-[85%] whitespace-pre-wrap rounded-3xl bg-zinc-800/90 px-4 py-2.5 text-[15px] text-zinc-100 [overflow-wrap:anywhere]">
+                          {m.text}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-full">
+                        <div className="text-[15px] leading-relaxed text-zinc-100">
+                          <Markdown>{m.text}</Markdown>
+                        </div>
+
+                        {m.steps && m.steps.some((s) => WRITE_TOOLS.has(s.tool)) && (
+                          <div className="mt-3 flex flex-col gap-1.5">
+                            {m.steps
+                              .filter((s) => WRITE_TOOLS.has(s.tool))
+                              .map((s, j) => (
+                                <ActionCard key={j} step={s} onNavigate={() => setOpen(false)} />
+                              ))}
+                          </div>
+                        )}
+
+                        {m.source === "ai" && (
+                          <MessageActions
+                            text={m.text}
+                            canSave={m.mode === "wonder"}
+                            saved={m.saved}
+                            saveDisabled={loading}
+                            onSave={() => saveThis(i)}
+                          />
                         )}
                       </div>
                     )}
@@ -373,14 +385,12 @@ export function FloatingChat() {
                 ))}
 
                 {loading && (
-                  <div className="flex justify-start">
-                    <div className="rounded-2xl rounded-bl-md border border-white/10 bg-white/5 px-4 py-3">
-                      <span className="flex gap-1">
-                        <span className="h-2 w-2 animate-bounce rounded-full bg-zinc-400 [animation-delay:-0.3s]" />
-                        <span className="h-2 w-2 animate-bounce rounded-full bg-zinc-400 [animation-delay:-0.15s]" />
-                        <span className="h-2 w-2 animate-bounce rounded-full bg-zinc-400" />
-                      </span>
-                    </div>
+                  <div className="flex justify-start py-1">
+                    <span className="flex gap-1.5">
+                      <span className="h-2 w-2 animate-bounce rounded-full bg-zinc-500 [animation-delay:-0.3s]" />
+                      <span className="h-2 w-2 animate-bounce rounded-full bg-zinc-500 [animation-delay:-0.15s]" />
+                      <span className="h-2 w-2 animate-bounce rounded-full bg-zinc-500" />
+                    </span>
                   </div>
                 )}
               </div>
@@ -394,76 +404,193 @@ export function FloatingChat() {
               }}
               className="border-t border-white/10"
             >
-              {images.length > 0 && (
-                <div className="mx-auto flex w-full max-w-2xl flex-wrap gap-2 px-4 pt-3">
-                  {images.map((src, k) => (
-                    <div key={k} className="relative">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={src} alt="attachment" className="h-14 w-14 rounded-lg object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => setImages((prev) => prev.filter((_, idx) => idx !== k))}
-                        className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-zinc-900 text-xs text-zinc-300 ring-1 ring-white/20"
-                        aria-label="Remove image"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div className="mx-auto flex w-full max-w-2xl items-end gap-2 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-                <label
-                  className="press grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-full border border-white/10 bg-white/5 text-lg text-zinc-300 hover:text-white"
-                  aria-label="Attach photo"
-                >
-                  📷
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => {
-                      addImages(e.target.files);
-                      e.target.value = "";
+              <div className="mx-auto w-full max-w-2xl px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2">
+                {images.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-2 px-1">
+                    {images.map((src, k) => (
+                      <div key={k} className="relative">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={src} alt="attachment" className="h-14 w-14 rounded-xl object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setImages((prev) => prev.filter((_, idx) => idx !== k))}
+                          className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-zinc-900 text-xs text-zinc-300 ring-1 ring-white/20"
+                          aria-label="Remove image"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {/* One unified pill: attach · input · mic · send */}
+                <div className="flex items-end gap-1 rounded-[1.7rem] border border-white/10 bg-white/[0.06] py-1.5 pl-1.5 pr-2 focus-within:border-white/20">
+                  <label
+                    className="press grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-full text-zinc-300 hover:bg-white/10 hover:text-white"
+                    aria-label="Attach photo"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                      <path d="M12 5v14M5 12h14" />
+                    </svg>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => {
+                        addImages(e.target.files);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  <textarea
+                    ref={taRef}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      // On desktop, Enter sends (Shift+Enter = newline). On touch
+                      // keyboards Enter inserts a newline; use the send button.
+                      if (e.key !== "Enter" || e.shiftKey) return;
+                      const coarse =
+                        typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)")?.matches;
+                      if (!coarse) {
+                        e.preventDefault();
+                        send(input);
+                      }
                     }}
+                    rows={1}
+                    enterKeyHint="enter"
+                    placeholder={mode === "wonder" ? "Think out loud…" : "Capture anything, or paste a note…"}
+                    className="max-h-40 min-h-[2.25rem] flex-1 resize-none self-center overflow-y-auto border-0 bg-transparent px-1 py-1.5 text-[15px] text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-0"
                   />
-                </label>
-                <textarea
-                  ref={taRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    // On desktop, Enter sends (Shift+Enter = newline). On touch
-                    // keyboards Enter inserts a newline; use the ↑ button to send.
-                    if (e.key !== "Enter" || e.shiftKey) return;
-                    const coarse =
-                      typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)")?.matches;
-                    if (!coarse) {
-                      e.preventDefault();
-                      send(input);
-                    }
-                  }}
-                  rows={1}
-                  enterKeyHint="enter"
-                  placeholder={mode === "wonder" ? "Think out loud…" : "Tell me what to capture, or paste a long note…"}
-                  className="max-h-40 min-h-[2.6rem] flex-1 resize-none overflow-y-auto rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-violet-400/50 focus:outline-none"
-                />
-                <MicButton value={input} onChange={setInput} className="h-10 w-10 shrink-0" />
-                <button
-                  type="submit"
-                  disabled={loading || (!input.trim() && images.length === 0)}
-                  className="press grid h-10 w-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-violet-500 to-sky-600 text-white disabled:opacity-40"
-                  aria-label="Send"
-                >
-                  ↑
-                </button>
+                  <MicButton value={input} onChange={setInput} className="h-9 w-9 shrink-0" />
+                  <button
+                    type="submit"
+                    disabled={loading || (!input.trim() && images.length === 0)}
+                    className="press grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-zinc-900 transition-opacity disabled:bg-white/20 disabled:text-zinc-500"
+                    aria-label="Send"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 19V5M5 12l7-7 7 7" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </form>
           </motion.div>
         )}
       </AnimatePresence>
     </>
+  );
+}
+
+function MessageActions({
+  text,
+  canSave,
+  saved,
+  saveDisabled,
+  onSave,
+}: {
+  text: string;
+  canSave: boolean;
+  saved?: boolean;
+  saveDisabled: boolean;
+  onSave: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {}
+  }
+
+  function speak() {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    if (speaking) {
+      window.speechSynthesis.cancel();
+      setSpeaking(false);
+      return;
+    }
+    const u = new SpeechSynthesisUtterance(text);
+    u.onend = () => setSpeaking(false);
+    u.onerror = () => setSpeaking(false);
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(u);
+    setSpeaking(true);
+  }
+
+  return (
+    <div className="mt-2 flex items-center gap-0.5 text-zinc-500">
+      <IconButton label={copied ? "Copied" : "Copy"} onClick={copy} active={copied}>
+        {copied ? (
+          <path d="M20 6 9 17l-5-5" />
+        ) : (
+          <>
+            <rect x="9" y="9" width="13" height="13" rx="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </>
+        )}
+      </IconButton>
+      <IconButton label={speaking ? "Stop" : "Read aloud"} onClick={speak} active={speaking}>
+        {speaking ? (
+          <>
+            <rect x="6" y="5" width="4" height="14" rx="1" />
+            <rect x="14" y="5" width="4" height="14" rx="1" />
+          </>
+        ) : (
+          <>
+            <path d="M11 5 6 9H2v6h4l5 4V5z" />
+            <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+            <path d="M19 5a9 9 0 0 1 0 14" />
+          </>
+        )}
+      </IconButton>
+      {canSave &&
+        (saved ? (
+          <span className="ml-1 inline-flex items-center gap-1 text-xs text-emerald-300">✓ saved</span>
+        ) : (
+          <button
+            onClick={onSave}
+            disabled={saveDisabled}
+            className="press ml-1 rounded-full border border-violet-400/30 bg-violet-500/10 px-3 py-1 text-xs text-violet-200 hover:bg-violet-500/20 disabled:opacity-50"
+          >
+            ✦ Save this
+          </button>
+        ))}
+    </div>
+  );
+}
+
+function IconButton({
+  label,
+  onClick,
+  active,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  active?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className={cn(
+        "press grid h-8 w-8 place-items-center rounded-lg transition-colors hover:bg-white/10 hover:text-zinc-200",
+        active && "text-emerald-300",
+      )}
+    >
+      <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        {children}
+      </svg>
+    </button>
   );
 }
 
