@@ -95,7 +95,7 @@ export function QuickCapture({ projects }: { projects: { id: string; title: stri
           rows={4}
           autoFocus
           placeholder="Dump a raw thought — a decision you made, something you learned, a question, an idea… I'll sort it into the right place."
-          className="w-full rounded-xl border border-zinc-700 bg-zinc-900/60 p-4 pr-14 text-zinc-100 placeholder:text-zinc-600 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-violet-500/40"
+          className="elev w-full rounded-2xl border border-white/10 bg-white/[0.04] p-4 pr-14 leading-relaxed text-zinc-100 backdrop-blur-sm transition-colors placeholder:text-zinc-600 focus:border-violet-400/40 focus:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-violet-500/30"
         />
         <MicButton value={text} onChange={setText} className="absolute right-3 top-3 h-9 w-9" />
       </div>
@@ -104,7 +104,7 @@ export function QuickCapture({ projects }: { projects: { id: string; title: stri
         <button
           onClick={sort}
           disabled={!text.trim() || loading}
-          className="rounded-lg bg-gradient-to-r from-violet-600 to-sky-600 px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          className="press glow-violet rounded-xl bg-gradient-to-r from-violet-600 to-sky-600 px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50 disabled:shadow-none"
         >
           {loading ? "Sorting…" : "✨ Sort it for me"}
         </button>

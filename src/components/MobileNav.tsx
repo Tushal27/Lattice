@@ -79,7 +79,7 @@ function TabLink({ href, label, icon, active }: { href: string; label: string; i
     <Link
       href={href}
       className={cn(
-        "relative flex w-16 flex-col items-center gap-0.5 py-2 transition-colors",
+        "press relative flex w-16 flex-col items-center gap-0.5 py-2 transition-colors",
         active ? "text-zinc-50" : "text-zinc-500",
       )}
     >
@@ -90,7 +90,13 @@ function TabLink({ href, label, icon, active }: { href: string; label: string; i
           className="absolute -top-1 h-1 w-8 rounded-full bg-gradient-to-r from-violet-400 to-sky-400"
         />
       )}
-      <span className="text-lg leading-none">{icon}</span>
+      <motion.span
+        animate={{ scale: active ? 1.12 : 1, y: active ? -1 : 0 }}
+        transition={{ type: "spring", stiffness: 420, damping: 18 }}
+        className="text-lg leading-none"
+      >
+        {icon}
+      </motion.span>
       <span className="text-[10px]">{label}</span>
     </Link>
   );

@@ -87,7 +87,7 @@ export function ConnectionPanel({
   return (
     <div className="space-y-6">
       <section>
-        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-400">Connections</h3>
+        <h3 className="section-label mb-3">Connections</h3>
         {existingList.length === 0 ? (
           <p className="text-sm text-zinc-500">No connections yet. Link this to related ideas below.</p>
         ) : (
@@ -95,7 +95,7 @@ export function ConnectionPanel({
             {existingList.map((c) => (
               <li
                 key={c.connectionId}
-                className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-900/40 p-3"
+                className="elev lift flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-white/[0.03] p-3 hover:border-white/15"
               >
                 <Link href={`/entry/${c.id}`} className="min-w-0 flex-1">
                   <div className="mb-1 flex items-center gap-2">
@@ -119,11 +119,11 @@ export function ConnectionPanel({
       {suggestList.length > 0 && (
         <section>
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-400">You might connect…</h3>
+            <h3 className="section-label">You might connect…</h3>
             <button
               onClick={askInsight}
               disabled={loadingInsight}
-              className="rounded-full bg-gradient-to-r from-violet-600 to-sky-600 px-3 py-1 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="press rounded-full bg-gradient-to-r from-violet-600 to-sky-600 px-3 py-1 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               {loadingInsight ? "Thinking…" : "✦ Ask AI why"}
             </button>
@@ -142,7 +142,7 @@ export function ConnectionPanel({
             {suggestList.map((s) => (
               <li
                 key={s.id}
-                className="flex items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-900/30 p-3"
+                className="elev lift flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-white/[0.02] p-3 hover:border-white/15"
               >
                 <Link href={`/entry/${s.id}`} className="min-w-0 flex-1">
                   <div className="mb-1 flex items-center gap-2">
@@ -153,7 +153,7 @@ export function ConnectionPanel({
                 <button
                   onClick={() => link(s)}
                   disabled={busy === s.id}
-                  className="shrink-0 rounded-lg border border-zinc-700 px-2.5 py-1 text-xs text-zinc-300 transition-colors hover:border-violet-500/50 hover:text-violet-300 disabled:opacity-50"
+                  className="press shrink-0 rounded-lg border border-white/10 px-2.5 py-1 text-xs text-zinc-300 transition-colors hover:border-violet-500/50 hover:text-violet-300 disabled:opacity-50"
                 >
                   + link
                 </button>

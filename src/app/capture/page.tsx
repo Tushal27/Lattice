@@ -3,7 +3,7 @@ import { EntryForm } from "@/components/EntryForm";
 import { QuickCapture } from "@/components/QuickCapture";
 import { PageHeader } from "@/components/ui";
 import { listProjects } from "@/lib/entries";
-import { TYPE_LIST, TYPES, isEntryType } from "@/lib/types";
+import { MODULES, TYPES, isEntryType } from "@/lib/types";
 import { accent, cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -22,32 +22,41 @@ export default async function CapturePage(props: PageProps<"/capture">) {
           <QuickCapture projects={projects.map((p) => ({ id: p.id, title: p.title }))} />
         </div>
 
-        <div className="mb-4 flex items-center gap-3 text-xs uppercase tracking-wider text-zinc-600">
+        <div className="mb-6 flex items-center gap-3 text-xs uppercase tracking-wider text-zinc-600">
           <span className="h-px flex-1 bg-zinc-800" /> or pick an area <span className="h-px flex-1 bg-zinc-800" />
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {TYPE_LIST.map((t) => {
-            const a = accent(t.accent);
-            return (
-              <Link
-                key={t.type}
-                href={`/capture?type=${t.type}`}
-                className={cn(
-                  "group relative overflow-hidden rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-5 transition-all hover:-translate-y-0.5 hover:border-zinc-700",
-                )}
-              >
-                <div className={cn("absolute inset-0 opacity-0 transition-opacity group-hover:opacity-100", a.bg)} />
-                <div className="relative">
-                  <div className={cn("mb-3 grid h-11 w-11 place-items-center rounded-xl text-xl", a.bg, a.border, "border")}>
-                    {t.icon}
-                  </div>
-                  <h3 className="font-semibold text-zinc-100">{t.label}</h3>
-                  <p className="mt-1 text-sm text-zinc-400">{t.tagline}</p>
-                </div>
-              </Link>
-            );
-          })}
+        <div className="space-y-8">
+          {MODULES.map((m) => (
+            <div key={m.id}>
+              <div className="mb-3 flex items-center gap-2 px-1">
+                <span className="text-base">{m.icon}</span>
+                <span className="section-label">{m.name}</span>
+              </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {m.types.map((t) => {
+                  const a = accent(t.accent);
+                  return (
+                    <Link
+                      key={t.type}
+                      href={`/capture?type=${t.type}`}
+                      className="press group elev lift relative overflow-hidden rounded-2xl border border-white/8 bg-white/[0.035] p-5 focus-ring"
+                    >
+                      <div className={cn("pointer-events-none absolute inset-x-0 top-0 h-px opacity-60", a.dot)} />
+                      <div className={cn("pointer-events-none absolute inset-0 opacity-0 transition-opacity group-hover:opacity-100", a.bg)} />
+                      <div className="relative">
+                        <div className={cn("mb-3 grid h-11 w-11 place-items-center rounded-xl border text-xl", a.bg, a.border)}>
+                          {t.icon}
+                        </div>
+                        <h3 className="font-semibold text-zinc-100">{t.label}</h3>
+                        <p className="mt-1 text-sm leading-relaxed text-zinc-400">{t.tagline}</p>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );
