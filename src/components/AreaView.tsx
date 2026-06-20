@@ -18,18 +18,24 @@ export async function AreaView({ type }: { type: EntryType }) {
         title={cfg.plural}
         subtitle={cfg.tagline}
         action={
-          <Link
-            href={`/capture?type=${type}`}
-            className={cn(
-              "rounded-lg border px-4 py-2 text-sm font-medium transition-colors",
-              a.bg,
-              a.border,
-              a.text,
-              "hover:brightness-125",
+          <div className="flex items-center gap-3">
+            {entries.length > 0 && (
+              <span className="tabnums rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-zinc-400">
+                {entries.length}
+              </span>
             )}
-          >
-            ＋ New {cfg.label}
-          </Link>
+            <Link
+              href={`/capture?type=${type}`}
+              className={cn(
+                "press rounded-lg border px-4 py-2 text-sm font-medium transition-all hover:brightness-125",
+                a.bg,
+                a.border,
+                a.text,
+              )}
+            >
+              ＋ New {cfg.label}
+            </Link>
+          </div>
         }
       />
 

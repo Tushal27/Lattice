@@ -67,35 +67,70 @@ export default async function EntryPage(props: PageProps<"/entry/[id]">) {
 
   return (
     <div className="animate-[fadeUp_0.4s_ease-out]">
-      <Link href={`/${cfg.slug}`} className="mb-6 inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-300">
-        ← {cfg.plural}
+      <Link
+        href={`/area/${cfg.slug}`}
+        className="group mb-6 inline-flex items-center gap-1.5 text-sm text-zinc-500 transition-colors hover:text-zinc-200"
+      >
+        <span className="transition-transform group-hover:-translate-x-0.5">←</span> {cfg.plural}
       </Link>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0">
-          <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-            <div className="min-w-0">
-              <div className="mb-3 flex items-center gap-3">
-                <TypeBadge type={entry.type} />
-                <span className="text-xs text-zinc-500">added {relativeTime(entry.createdAt)}</span>
+          {/* Premium hero */}
+          <div className="ring-gradient elev relative mb-6 overflow-hidden rounded-3xl border border-white/8 bg-white/[0.03] p-6">
+            <div className={cn("pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full opacity-25 blur-3xl", a.dot)} />
+            <div className="relative">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex min-w-0 items-start gap-4">
+                  <span
+                    className={cn(
+                      "hidden h-12 w-12 shrink-0 place-items-center rounded-2xl border text-2xl sm:grid",
+                      a.bg,
+                      a.border,
+                    )}
+                  >
+                    {cfg.icon}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <TypeBadge type={entry.type} />
+                      <span className="tabnums text-xs text-zinc-500">added {relativeTime(entry.createdAt)}</span>
+                    </div>
+                    <h1 className="break-words text-3xl font-semibold leading-[1.1] text-zinc-50">{entry.title}</h1>
+                    {entry.summary && (
+                      <p className="mt-2 break-words text-[15px] leading-relaxed text-zinc-400">{entry.summary}</p>
+                    )}
+                  </div>
+                </div>
+                <EntryToolbar id={entry.id} />
               </div>
-              <h1 className="break-words text-2xl font-semibold leading-tight text-zinc-50">{entry.title}</h1>
-              {entry.summary && <p className="mt-2 break-words text-zinc-400">{entry.summary}</p>}
-            </div>
-            <EntryToolbar id={entry.id} />
-          </div>
 
-          <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-zinc-500">
-            {entry.confidence != null && (
-              <span className={cn("rounded-full px-2 py-0.5", a.bg, a.text)}>confidence {entry.confidence}%</span>
-            )}
-            {entry.status && <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-zinc-300">{entry.status}</span>}
-            {entry.occurredAt && <span>📅 {formatDate(entry.occurredAt)}</span>}
-            {entry.project && (
-              <Link href={`/entry/${entry.project.id}`} className="text-violet-300 hover:underline">
-                🚀 {entry.project.title}
-              </Link>
-            )}
+              {(entry.confidence != null || entry.status || entry.occurredAt || entry.project) && (
+                <div className="mt-5 flex flex-wrap items-center gap-2">
+                  {entry.confidence != null && (
+                    <span className={cn("tabnums rounded-full px-2.5 py-1 text-xs font-medium", a.bg, a.text)}>
+                      confidence {entry.confidence}%
+                    </span>
+                  )}
+                  {entry.status && (
+                    <span className="rounded-full bg-white/5 px-2.5 py-1 text-xs text-zinc-300">{entry.status}</span>
+                  )}
+                  {entry.occurredAt && (
+                    <span className="tabnums rounded-full bg-white/5 px-2.5 py-1 text-xs text-zinc-400">
+                      📅 {formatDate(entry.occurredAt)}
+                    </span>
+                  )}
+                  {entry.project && (
+                    <Link
+                      href={`/entry/${entry.project.id}`}
+                      className="rounded-full bg-violet-500/10 px-2.5 py-1 text-xs text-violet-300 transition-colors hover:bg-violet-500/20"
+                    >
+                      🚀 {entry.project.title}
+                    </Link>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {entry.tags.length > 0 && (
@@ -121,11 +156,13 @@ export default async function EntryPage(props: PageProps<"/entry/[id]">) {
           )}
 
           {contentFields.length > 0 && (
-            <div className="space-y-5">
+            <div className="space-y-3">
               {contentFields.map((f) => (
-                <div key={f.key}>
-                  <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500">{f.label}</h3>
-                  <p className="whitespace-pre-line [overflow-wrap:anywhere] text-zinc-200">{values[f.key]}</p>
+                <div key={f.key} className={cn("rounded-r-xl border-l-2 bg-white/[0.02] py-3 pl-4 pr-4", a.border)}>
+                  <div className="section-label mb-1.5">{f.label}</div>
+                  <p className="whitespace-pre-line [overflow-wrap:anywhere] leading-relaxed text-zinc-200">
+                    {values[f.key]}
+                  </p>
                 </div>
               ))}
             </div>

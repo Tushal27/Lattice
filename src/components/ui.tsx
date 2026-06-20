@@ -49,14 +49,22 @@ export function PageHeader({
   const a = accentColor ? accent(accentColor) : null;
   return (
     <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-      <div>
+      <div className="min-w-0">
         <h1 className="flex items-center gap-3 text-2xl font-semibold text-zinc-50">
           {icon && (
-            <span className={cn("grid h-10 w-10 place-items-center rounded-xl text-xl", a?.bg)}>{icon}</span>
+            <span
+              className={cn(
+                "grid h-11 w-11 shrink-0 place-items-center rounded-2xl border text-xl",
+                a?.bg,
+                a?.border ?? "border-white/10",
+              )}
+            >
+              {icon}
+            </span>
           )}
           {title}
         </h1>
-        {subtitle && <p className="mt-2 max-w-2xl text-sm text-zinc-400">{subtitle}</p>}
+        {subtitle && <p className="mt-2 max-w-2xl text-sm leading-relaxed text-zinc-400">{subtitle}</p>}
       </div>
       {action}
     </div>
@@ -75,6 +83,6 @@ export function EmptyState({ icon, title, hint }: { icon: string; title: string;
 
 export function Card({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-5", className)}>{children}</div>
+    <div className={cn("elev rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-5", className)}>{children}</div>
   );
 }

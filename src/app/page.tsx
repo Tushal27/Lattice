@@ -61,7 +61,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   return (
     <div className="animate-[fadeUp_0.4s_ease-out] space-y-10">
       {/* Hero */}
-      <section className="ring-gradient relative overflow-hidden rounded-3xl border border-white/8 bg-white/[0.03] p-8 backdrop-blur-sm">
+      <section className="ring-gradient elev relative overflow-hidden rounded-3xl border border-white/8 bg-white/[0.03] p-8 backdrop-blur-sm">
         <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-violet-600/25 blur-3xl" />
         <div className="absolute -bottom-24 left-1/4 h-56 w-56 rounded-full bg-sky-600/15 blur-3xl" />
         <div className="relative">
@@ -130,7 +130,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         {/* Side rail: nudges */}
         <aside className="space-y-6">
           {dueNow.length > 0 && (
-            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+            <div className="elev rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
               <h3 className="mb-2 flex items-center justify-between text-sm font-semibold text-emerald-200">
                 <span className="flex items-center gap-2">🎯 Commitments</span>
                 {commitments.overdue.length > 0 && (
@@ -158,7 +158,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
           )}
 
           {awaitingReview.length > 0 && (
-            <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4">
+            <div className="elev rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4">
               <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-200">⏳ Time to review</h3>
               <p className="mb-3 text-xs text-amber-200/70">Decisions old enough to judge.</p>
               <ul className="space-y-2">
@@ -174,7 +174,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             </div>
           )}
 
-          <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-4">
+          <div className="elev rounded-2xl border border-zinc-800/80 bg-zinc-900/40 p-4">
             <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-sky-200">❓ Open questions</h3>
             {openQuestions.length === 0 ? (
               <p className="text-xs text-zinc-500">
@@ -196,7 +196,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
             )}
           </div>
 
-          <div className="rounded-2xl border border-violet-500/20 bg-gradient-to-b from-violet-500/10 to-transparent p-4">
+          <div className="elev rounded-2xl border border-violet-500/20 bg-gradient-to-b from-violet-500/10 to-transparent p-4">
             <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-violet-200">🧠 Thinking partner</h3>
             <p className="mb-3 text-xs text-violet-200/70">Find patterns and challenge your assumptions.</p>
             <OpenChatButton

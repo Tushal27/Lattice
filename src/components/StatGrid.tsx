@@ -27,7 +27,7 @@ export function StatGrid({ counts, types = TYPE_LIST }: { counts: Record<string,
               <motion.div
                 whileHover={{ y: -4 }}
                 whileTap={{ scale: 0.97 }}
-                className="ring-gradient relative overflow-hidden rounded-2xl border border-white/8 bg-white/[0.03] p-4 backdrop-blur-sm"
+                className="ring-gradient elev lift relative overflow-hidden rounded-2xl border border-white/8 bg-white/[0.03] p-4 backdrop-blur-sm"
               >
                 <div
                   className={cn(
@@ -38,7 +38,7 @@ export function StatGrid({ counts, types = TYPE_LIST }: { counts: Record<string,
                 <div className={cn("absolute inset-x-0 top-0 h-0.5", a.dot)} />
                 <div className="relative">
                   <div className="mb-2 text-2xl">{t.icon}</div>
-                  <AnimatedNumber value={count} className="text-2xl font-semibold text-zinc-50" />
+                  <AnimatedNumber value={count} className="tabnums text-2xl font-semibold text-zinc-50" />
                   <div className="text-xs text-zinc-500">{t.plural}</div>
                 </div>
               </motion.div>

@@ -24,6 +24,20 @@ body {
   min-height: 100dvh;
 }
 
+/* Tighten large headings the way modern product UIs (Linear/Vercel) do, and
+   give numerals a steady tabular rhythm. */
+h1,
+h2,
+h3 {
+  letter-spacing: -0.02em;
+}
+h1 {
+  letter-spacing: -0.03em;
+}
+.tabnums {
+  font-variant-numeric: tabular-nums;
+}
+
 /* Living aurora backdrop — slow, GPU-friendly drifting gradients behind everything. */
 body::before {
   content: "";
@@ -155,6 +169,44 @@ body::after {
 }
 .press:active {
   transform: scale(0.96);
+}
+
+/* Depth: a top inner highlight + layered shadow so cards feel lifted off the
+   canvas instead of painted on it. `.lift` animates that depth on hover. */
+.elev {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 10px 30px -18px rgba(0, 0, 0, 0.8);
+}
+.lift {
+  transition:
+    box-shadow 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.28s ease;
+}
+.lift:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    0 2px 6px rgba(0, 0, 0, 0.5),
+    0 22px 48px -22px rgba(0, 0, 0, 0.9);
+}
+
+/* App-wide keyboard focus ring (offset against the dark canvas). */
+.focus-ring:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px #07070a,
+    0 0 0 4px rgba(139, 92, 246, 0.6);
+}
+
+/* Tiny uppercase section label used above field groups. */
+.section-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #71717a;
 }
 
 ::selection {

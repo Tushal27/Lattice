@@ -22,13 +22,15 @@ export function EntryCard({ entry }: { entry: EntryCardData }) {
   const a = accent(cfg?.accent ?? "violet");
 
   return (
-    <Link href={`/entry/${entry.id}`} className="group block">
+    <Link href={`/entry/${entry.id}`} className="group block rounded-2xl focus-ring">
       <motion.div
         whileHover={{ y: -3 }}
         whileTap={{ scale: 0.985 }}
         transition={{ type: "spring", stiffness: 400, damping: 28 }}
-        className="ring-gradient relative h-full overflow-hidden rounded-2xl border border-white/8 bg-white/[0.03] p-4 backdrop-blur-sm transition-colors group-hover:bg-white/[0.06]"
+        className="elev lift relative h-full overflow-hidden rounded-2xl border border-white/8 bg-white/[0.035] p-4 backdrop-blur-sm group-hover:border-white/15 group-hover:bg-white/[0.06]"
       >
+        {/* accent hairline along the top edge */}
+        <div className={cn("pointer-events-none absolute inset-x-0 top-0 h-px opacity-60", a.dot)} />
         {/* accent glow that blooms on hover */}
         <div
           className={cn(
@@ -39,22 +41,29 @@ export function EntryCard({ entry }: { entry: EntryCardData }) {
         <div className="relative">
           <div className="mb-2 flex items-center justify-between gap-2">
             <TypeBadge type={entry.type} />
-            <span className="text-[11px] text-zinc-500">{relativeTime(entry.createdAt)}</span>
+            <span className="tabnums text-[11px] text-zinc-500">{relativeTime(entry.createdAt)}</span>
           </div>
-          <h3 className="break-words font-medium leading-snug text-zinc-100 group-hover:text-white">{entry.title}</h3>
-          {entry.summary && <p className="mt-1 text-sm text-zinc-400">{truncate(entry.summary, 140)}</p>}
+          <h3 className="break-words font-medium leading-snug text-zinc-100 transition-colors group-hover:text-white">
+            {entry.title}
+          </h3>
+          {entry.summary && <p className="mt-1 text-sm leading-relaxed text-zinc-400">{truncate(entry.summary, 140)}</p>}
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-zinc-500">
             {entry.status && (
               <span className="rounded-full bg-white/5 px-2 py-0.5 text-zinc-300">{entry.status}</span>
             )}
             {typeof entry.confidence === "number" && (
-              <span className={a.text}>confidence {entry.confidence}%</span>
+              <span className={cn("tabnums", a.text)}>confidence {entry.confidence}%</span>
             )}
             {entry.tags && entry.tags.length > 0 && (
-              <span className="text-zinc-500">{entry.tags.map((t) => `#${t.tag.name}`).join(" ")}</span>
+              <span className="truncate text-zinc-500">{entry.tags.map((t) => `#${t.tag.name}`).join(" ")}</span>
             )}
           </div>
         </div>
+
+        {/* hover chevron */}
+        <span className="pointer-events-none absolute bottom-3 right-3 translate-x-1 text-zinc-600 opacity-0 transition-all duration-300 group-hover:translate-x-0 group-hover:opacity-100">
+          →
+        </span>
       </motion.div>
     </Link>
   );
