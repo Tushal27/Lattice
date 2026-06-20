@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { motion } from "motion/react";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
-import { TYPE_LIST } from "@/lib/types";
+import { TYPE_LIST, type TypeConfig } from "@/lib/types";
 import { accent, cn } from "@/lib/utils";
 
-export function StatGrid({ counts }: { counts: Record<string, number> }) {
+export function StatGrid({ counts, types = TYPE_LIST }: { counts: Record<string, number>; types?: TypeConfig[] }) {
   return (
     <motion.div
       initial="hidden"
@@ -14,7 +14,7 @@ export function StatGrid({ counts }: { counts: Record<string, number> }) {
       variants={{ show: { transition: { staggerChildren: 0.06 } } }}
       className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5"
     >
-      {TYPE_LIST.map((t) => {
+      {types.map((t) => {
         const a = accent(t.accent);
         const count = counts[t.type] ?? 0;
         return (
@@ -23,7 +23,7 @@ export function StatGrid({ counts }: { counts: Record<string, number> }) {
             variants={{ hidden: { opacity: 0, y: 14 }, show: { opacity: 1, y: 0 } }}
             transition={{ type: "spring", stiffness: 300, damping: 24 }}
           >
-            <Link href={`/${t.slug}`} className="group block">
+            <Link href={`/area/${t.slug}`} className="group block">
               <motion.div
                 whileHover={{ y: -4 }}
                 whileTap={{ scale: 0.97 }}

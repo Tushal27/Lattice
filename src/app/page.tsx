@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { EntryCard } from "@/components/EntryCard";
 import { InsightFeed } from "@/components/InsightFeed";
+import { ModuleSwitcher } from "@/components/ModuleSwitcher";
 import { OpenChatButton } from "@/components/OpenChatButton";
 import { StatGrid } from "@/components/StatGrid";
 import { decisionsAwaitingReview, getStats, listEntries } from "@/lib/entries";
 import { groupedCommitments } from "@/lib/commitments";
 import { refreshInsights, type InsightRow } from "@/lib/insights";
 import { prisma } from "@/lib/db";
+import { moduleById, typesForModule } from "@/lib/types";
 import { relativeTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -19,10 +21,16 @@ function greeting() {
   return "Good evening";
 }
 
-export default async function Home() {
-  const [stats, recent, awaitingReview, openQuestions, commitments, insights] = await Promise.all([
+export default async function Home({ searchParams }: PageProps<"/">) {
+  const sp = await searchParams;
+  const activeModule = typeof sp.module === "string" ? sp.module : "all";
+  const moduleTypes = typesForModule(activeModule);
+  const typeKeys = new Set(moduleTypes.map((t) => t.type));
+  const scoped = activeModule !== "all";
+
+  const [stats, recentAll, awaitingReview, openQuestions, commitments, insights] = await Promise.all([
     getStats(),
-    listEntries({ limit: 6 }),
+    listEntries({ limit: scoped ? 40 : 6 }),
     decisionsAwaitingReview(),
     prisma.entry.findMany({
       where: { type: "question", status: "open" },
@@ -34,6 +42,7 @@ export default async function Home() {
     refreshInsights(),
   ]);
 
+  const recent = scoped ? recentAll.filter((e) => typeKeys.has(e.type)).slice(0, 6) : recentAll;
   const dueNow = [...commitments.overdue, ...commitments.today];
   const insightItems = insights.map((i: InsightRow) => ({
     id: i.id,
@@ -82,8 +91,11 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* Area stats */}
-      <StatGrid counts={stats.byType} />
+      {/* Module switcher */}
+      <ModuleSwitcher active={activeModule} />
+
+      {/* Area stats (scoped to the active module) */}
+      <StatGrid counts={stats.byType} types={moduleTypes} />
 
       {/* Proactive intelligence */}
       <InsightFeed initial={insightItems} />
@@ -92,7 +104,9 @@ export default async function Home() {
         {/* Recent */}
         <section>
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-zinc-100">Recent</h2>
+            <h2 className="text-lg font-semibold text-zinc-100">
+              Recent{scoped ? ` · ${moduleById(activeModule)?.name ?? ""}` : ""}
+            </h2>
             <Link href="/timeline" className="text-sm text-zinc-500 hover:text-zinc-300">
               timeline →
             </Link>

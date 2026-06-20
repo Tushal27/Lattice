@@ -47,6 +47,10 @@ export const ACCENT: Record<string, { text: string; bg: string; border: string; 
   fuchsia: { text: "text-fuchsia-300", bg: "bg-fuchsia-500/10", border: "border-fuchsia-500/30", dot: "bg-fuchsia-400", ring: "focus:ring-fuchsia-500/40" },
   sky: { text: "text-sky-300", bg: "bg-sky-500/10", border: "border-sky-500/30", dot: "bg-sky-400", ring: "focus:ring-sky-500/40" },
   violet: { text: "text-violet-300", bg: "bg-violet-500/10", border: "border-violet-500/30", dot: "bg-violet-400", ring: "focus:ring-violet-500/40" },
+  rose: { text: "text-rose-300", bg: "bg-rose-500/10", border: "border-rose-500/30", dot: "bg-rose-400", ring: "focus:ring-rose-500/40" },
+  cyan: { text: "text-cyan-300", bg: "bg-cyan-500/10", border: "border-cyan-500/30", dot: "bg-cyan-400", ring: "focus:ring-cyan-500/40" },
+  orange: { text: "text-orange-300", bg: "bg-orange-500/10", border: "border-orange-500/30", dot: "bg-orange-400", ring: "focus:ring-orange-500/40" },
+  lime: { text: "text-lime-300", bg: "bg-lime-500/10", border: "border-lime-500/30", dot: "bg-lime-400", ring: "focus:ring-lime-500/40" },
 };
 
 export function accent(name: string) {

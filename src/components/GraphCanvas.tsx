@@ -21,6 +21,10 @@ const COLORS: Record<string, string> = {
   aha: "#e879f9",
   question: "#38bdf8",
   project: "#a78bfa",
+  incident: "#fb7185",
+  architecture: "#22d3ee",
+  bug: "#fb923c",
+  snippet: "#a3e635",
   commitment: "#2dd4bf",
 };
 

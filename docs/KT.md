@@ -34,6 +34,26 @@ photograph) gets trimmed. The whole system is config-driven in
 
 ---
 
+## 2b. Modules (Lattice core + OS packs)
+
+Lattice is a **core engine** (capture, AI agent, connections, graph, search,
+reminders, semantic memory, insights) that operates on generic entries. A
+**module** is just a pack of config that plugs in its own entry types — and
+everything above works on them for free. It's **one shared brain**: modules
+cross-connect, and the graph/search/insights span all of them.
+
+- **Personal** (built-in): the five core areas above.
+- **Engineering OS**: `incident` (🔥), `architecture`/ADR (🏛️), `bug`/debug log
+  (🪲), `snippet`/pattern (🧩) — plus engineering insights (an ADR stuck in
+  "proposed", an incident with no prevention follow-up).
+
+The **dashboard module switcher** (All / Personal / Engineering …) scopes the
+stats and recent list to one lens without siloing data. Area lists live at
+`/area/<slug>`. Adding a new module is a single config file in
+`src/lib/modules/` registered in `src/lib/types.ts` — no UI rewrite.
+
+---
+
 ## 3. Capturing (five ways)
 
 1. **The Agent (✦) — Capture mode:** say it in plain words and it files the

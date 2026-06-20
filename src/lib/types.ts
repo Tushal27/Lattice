@@ -1,8 +1,15 @@
 // The shape of every captured area is described declaratively here. One config
-// drives the capture form, the detail renderer, and validation — so adding a
-// field (or a whole new area) is a data change, not a UI rewrite.
+// drives the capture form, the detail renderer, the agent schema, and validation
+// — so adding a field, a whole new area, or an entire MODULE (Engineering, Health,
+// …) is a data change, not a UI rewrite. The five core types below are the
+// built-in "Personal" module; other modules contribute their own types and the
+// rest of the app picks them up automatically.
 
-export type EntryType = "decision" | "lesson" | "aha" | "question" | "project";
+// Entry-type keys are dynamic now (modules add their own), so this is a string
+// alias rather than a fixed union — runtime guards (isEntryType) keep it honest.
+import { engineeringModule } from "@/lib/modules/engineering";
+
+export type EntryType = string;
 
 export type FieldKind = "text" | "textarea" | "select" | "number" | "date";
 
@@ -20,7 +27,7 @@ export interface FieldDef {
 }
 
 export interface TypeConfig {
-  type: EntryType;
+  type: string;
   label: string;
   plural: string;
   slug: string;
@@ -138,24 +145,61 @@ const project: TypeConfig = {
   ],
 };
 
-export const TYPES: Record<EntryType, TypeConfig> = {
-  decision,
-  lesson,
-  aha,
-  question,
-  project,
+// ---- modules ---------------------------------------------------------------
+
+export interface ModuleConfig {
+  id: string; // "core" | "engineering" | …
+  name: string;
+  icon: string;
+  accent: string;
+  tagline: string;
+  types: TypeConfig[];
+  /** Extra guidance appended to the agent's system prompt. */
+  agentHint?: string;
+}
+
+// The built-in personal module — Lattice as you've used it so far.
+export const coreModule: ModuleConfig = {
+  id: "core",
+  name: "Personal",
+  icon: "🧠",
+  accent: "violet",
+  tagline: "Decisions, lessons, breakthroughs, questions, and projects.",
+  types: [decision, lesson, aha, question, project],
 };
 
-export const TYPE_LIST: TypeConfig[] = [decision, lesson, aha, question, project];
+// Registered modules. Adding one here lights it up everywhere — one shared brain.
+export const MODULES: ModuleConfig[] = [coreModule, engineeringModule];
 
-export const SLUG_TO_TYPE: Record<string, EntryType> = Object.fromEntries(
-  TYPE_LIST.map((t) => [t.slug, t.type]),
-) as Record<string, EntryType>;
+export const TYPE_LIST: TypeConfig[] = MODULES.flatMap((m) => m.types);
+
+export const TYPES: Record<string, TypeConfig> = Object.fromEntries(TYPE_LIST.map((t) => [t.type, t]));
+
+export const SLUG_TO_TYPE: Record<string, string> = Object.fromEntries(TYPE_LIST.map((t) => [t.slug, t.type]));
+
+// type-key → owning module, for scoping views to a module.
+const TYPE_TO_MODULE: Record<string, ModuleConfig> = Object.fromEntries(
+  MODULES.flatMap((m) => m.types.map((t) => [t.type, m])),
+);
 
 export function isEntryType(value: string): value is EntryType {
   return value in TYPES;
 }
 
 export function configFor(type: string): TypeConfig | undefined {
-  return isEntryType(type) ? TYPES[type] : undefined;
+  return TYPES[type];
+}
+
+export function moduleForType(type: string): ModuleConfig | undefined {
+  return TYPE_TO_MODULE[type];
+}
+
+export function moduleById(id: string): ModuleConfig | undefined {
+  return MODULES.find((m) => m.id === id);
+}
+
+/** Type configs belonging to a module id, or all types for "all"/unknown. */
+export function typesForModule(id: string | null | undefined): TypeConfig[] {
+  if (!id || id === "all") return TYPE_LIST;
+  return moduleById(id)?.types ?? TYPE_LIST;
 }

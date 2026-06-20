@@ -22,7 +22,7 @@ import {
   searchEntries,
   updateEntry,
 } from "@/lib/entries";
-import { TYPE_LIST, TYPES, isEntryType } from "@/lib/types";
+import { MODULES, TYPE_LIST, TYPES, isEntryType } from "@/lib/types";
 import { parseFields } from "@/lib/utils";
 
 const MAX_STEPS = 4;
@@ -481,6 +481,9 @@ const AGENT_SYSTEM = [
   "",
   "Entry types and their fields (put type-specific fields inside `fields`):",
   typeSchema(),
+  "",
+  "Module guidance (pick the most specific fitting type):",
+  ...MODULES.filter((m) => m.agentHint).map((m) => `- ${m.name}: ${m.agentHint}`),
   "",
   "Rules:",
   "- IF AN IMAGE IS ATTACHED: read everything in it (handwriting, whiteboard, screenshot, book page, diagram), transcribe the meaningful content, and capture it as the best-fit entry — keep the real text/details. If the user added a caption, treat it as guidance.",

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { TYPE_LIST } from "@/lib/types";
+import { MODULES } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const primary = [
@@ -11,12 +11,6 @@ const primary = [
   { href: "/review", label: "Daily Review", icon: "☀️" },
   { href: "/commitments", label: "Commitments", icon: "🎯" },
 ];
-
-const areas = TYPE_LIST.map((t) => ({
-  href: `/${t.slug}`,
-  label: t.plural,
-  icon: t.icon,
-}));
 
 const discover = [
   { href: "/learn", label: "Test Me", icon: "🎯" },
@@ -101,9 +95,16 @@ export function Sidebar() {
         {primary.map((n) => (
           <NavLink key={n.href} {...n} badge={n.href === "/commitments" ? dueCount : undefined} />
         ))}
-        <div className="mt-4 mb-1 px-3 text-[11px] font-medium uppercase tracking-wider text-zinc-600">Areas</div>
-        {areas.map((n) => (
-          <NavLink key={n.href} {...n} />
+        {MODULES.map((m) => (
+          <div key={m.id}>
+            <div className="mt-4 mb-1 flex items-center gap-1.5 px-3 text-[11px] font-medium uppercase tracking-wider text-zinc-600">
+              <span>{m.icon}</span>
+              {m.name}
+            </div>
+            {m.types.map((t) => (
+              <NavLink key={t.type} href={`/area/${t.slug}`} label={t.plural} icon={t.icon} />
+            ))}
+          </div>
         ))}
         <div className="mt-4 mb-1 px-3 text-[11px] font-medium uppercase tracking-wider text-zinc-600">Discover</div>
         {discover.map((n) => (

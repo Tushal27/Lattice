@@ -134,6 +134,34 @@ async function computeCandidates(): Promise<InsightCandidate[]> {
     }
   }
 
+  // 6b. Engineering OS triggers.
+  for (const e of entries) {
+    if (e.type === "architecture" && (e.status ?? "proposed") === "proposed" && now - e.createdAt.getTime() > 14 * DAY) {
+      out.push({
+        key: `adr-proposed:${e.id}`,
+        type: "ProjectStalled",
+        title: `ADR still "proposed": ${e.title}`,
+        body: "This architecture decision was never accepted or superseded. Resolve it?",
+        entityId: e.id,
+        priority: 40,
+      });
+    }
+  }
+  let incidents = 0;
+  for (const e of recentFirst) {
+    if (incidents >= 3) break;
+    if (e.type !== "incident" || now - e.createdAt.getTime() > 30 * DAY || committedSources.has(e.id)) continue;
+    incidents++;
+    out.push({
+      key: `incident-followup:${e.id}`,
+      type: "CommitmentOpportunity",
+      title: `Postmortem follow-up: ${e.title}`,
+      body: "Capture a prevention action so this incident doesn't recur.",
+      entityId: e.id,
+      priority: 55,
+    });
+  }
+
   // 7. Mistake warning: a NEW entry that echoes a PRIOR lesson. Matches on shared
   // tags AND overlapping words in title+summary (light stemming), so it catches
   // e.g. "move to Postgres because app feels slow" vs the lesson "page slowness
