@@ -386,6 +386,21 @@ export function entryToFormValues(entry: EntryColumns, type: string): Record<str
   return values;
 }
 
+/** A shuffled set of lessons/aha moments to quiz yourself on (active recall). */
+export async function recallCandidates(limit = 8) {
+  const pool = await prisma.entry.findMany({
+    where: { type: { in: ["lesson", "aha"] } },
+    orderBy: { createdAt: "desc" },
+    take: 80,
+    select: { id: true, type: true, title: true, summary: true, fields: true },
+  });
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, limit);
+}
+
 export async function entriesInRange(start: Date, end: Date) {
   return prisma.entry.findMany({
     where: { createdAt: { gte: start, lte: end } },

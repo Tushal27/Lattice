@@ -1,4 +1,4 @@
-import { askPartner, classifyThought, connectionInsight, judgment, reflection } from "@/lib/companion";
+import { askPartner, classifyThought, connectionInsight, judgment, quizBatch, reflection } from "@/lib/companion";
 
 export async function POST(request: Request) {
   let body: Record<string, unknown>;
@@ -34,6 +34,10 @@ export async function POST(request: Request) {
     }
     case "judgment":
       return Response.json(await judgment());
+    case "quiz": {
+      const items = Array.isArray(body.items) ? body.items : [];
+      return Response.json(await quizBatch(items as Parameters<typeof quizBatch>[0]));
+    }
     default:
       return Response.json({ error: "Unknown task" }, { status: 400 });
   }

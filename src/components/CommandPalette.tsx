@@ -95,6 +95,7 @@ export function CommandPalette() {
       keywords: `capture create ${t.plural}`,
     })),
     { id: "nav-home", label: "Dashboard", icon: "◇", run: () => go("/"), keywords: "home" },
+    { id: "nav-learn", label: "Test Me", icon: "🎯", run: () => go("/learn"), keywords: "recall quiz flashcards learn study" },
     { id: "nav-graph", label: "Knowledge Graph", icon: "🕸️", run: () => go("/graph"), keywords: "network connections lattice" },
     { id: "nav-review", label: "Daily Review", icon: "☀️", run: () => go("/review"), keywords: "resurface on this day" },
     { id: "nav-patterns", label: "Patterns", icon: "📊", run: () => go("/patterns"), keywords: "insights trends calibration" },

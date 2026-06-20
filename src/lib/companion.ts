@@ -269,6 +269,53 @@ function heuristicClassify(text: string): Omit<Classification, "source"> {
   return { type, title, summary: text.length > title.length ? text.slice(0, 200) : "", tags: [] };
 }
 
+export interface QuizItem {
+  id: string;
+  type: string;
+  title: string;
+  content: string;
+}
+
+/** One short active-recall question per note, for the Test Me feature. */
+export async function quizBatch(items: QuizItem[]): Promise<Record<string, string>> {
+  const fallback = () =>
+    Object.fromEntries(
+      items.map((i) => [
+        i.id,
+        i.type === "aha"
+          ? `What was the insight behind "${i.title}"?`
+          : `What did you take away from "${i.title}"?`,
+      ]),
+    );
+  if (items.length === 0) return {};
+
+  const prompt = [
+    "For each of my notes below, write ONE short active-recall question that tests whether I remember the insight.",
+    "Don't reveal the answer in the question. Respond with ONLY a JSON array of {\"id\":\"...\",\"q\":\"...\"}.",
+    "",
+    ...items.map((i) => `id ${i.id} [${i.type}] ${i.title} :: ${i.content.slice(0, 300)}`),
+  ].join("\n");
+
+  const ai = await generate(prompt, { system: THINKING_PARTNER_SYSTEM, temperature: 0.5 });
+  if (!ai) return fallback();
+
+  try {
+    const cleaned = ai.replace(/```json/gi, "").replace(/```/g, "").trim();
+    const start = cleaned.indexOf("[");
+    const end = cleaned.lastIndexOf("]");
+    const arr = JSON.parse(jsonrepair(cleaned.slice(start, end + 1)));
+    const out: Record<string, string> = {};
+    for (const row of arr) {
+      if (row && typeof row.id === "string" && typeof row.q === "string") out[row.id] = row.q;
+    }
+    // fill any missing with fallback
+    for (const i of items) if (!out[i.id]) out[i.id] = fallback()[i.id];
+    return out;
+  } catch {
+    return fallback();
+  }
+}
+
 export async function askPartner(
   message: string,
   history: { role: string; text: string }[] = [],

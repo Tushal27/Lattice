@@ -17,6 +17,7 @@ const areas = TYPE_LIST.map((t) => ({
 }));
 
 const discover = [
+  { href: "/learn", label: "Test Me", icon: "🎯" },
   { href: "/graph", label: "Knowledge Graph", icon: "🕸️" },
   { href: "/timeline", label: "Life Timeline", icon: "🧭" },
   { href: "/patterns", label: "Patterns", icon: "📊" },
