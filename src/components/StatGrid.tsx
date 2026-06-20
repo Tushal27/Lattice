@@ -3,10 +3,13 @@
 import Link from "next/link";
 import { motion } from "motion/react";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
-import { TYPE_LIST, type TypeConfig } from "@/lib/types";
+import { useModuleScope } from "@/components/ModuleSwitcher";
+import { typesForModule } from "@/lib/types";
 import { accent, cn } from "@/lib/utils";
 
-export function StatGrid({ counts, types = TYPE_LIST }: { counts: Record<string, number>; types?: TypeConfig[] }) {
+export function StatGrid({ counts }: { counts: Record<string, number> }) {
+  const { active } = useModuleScope();
+  const types = typesForModule(active);
   return (
     <motion.div
       initial="hidden"

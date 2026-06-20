@@ -1,14 +1,13 @@
 import Link from "next/link";
-import { EntryCard } from "@/components/EntryCard";
 import { InsightFeed } from "@/components/InsightFeed";
-import { ModuleSwitcher } from "@/components/ModuleSwitcher";
+import { ModuleScopeProvider, ModuleSwitcher } from "@/components/ModuleSwitcher";
 import { OpenChatButton } from "@/components/OpenChatButton";
+import { RecentEntries } from "@/components/RecentEntries";
 import { StatGrid } from "@/components/StatGrid";
 import { decisionsAwaitingReview, getStats, listEntries } from "@/lib/entries";
 import { groupedCommitments } from "@/lib/commitments";
 import { refreshInsights, type InsightRow } from "@/lib/insights";
 import { prisma } from "@/lib/db";
-import { moduleById, typesForModule } from "@/lib/types";
 import { relativeTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -21,16 +20,12 @@ function greeting() {
   return "Good evening";
 }
 
-export default async function Home({ searchParams }: PageProps<"/">) {
-  const sp = await searchParams;
-  const activeModule = typeof sp.module === "string" ? sp.module : "all";
-  const moduleTypes = typesForModule(activeModule);
-  const typeKeys = new Set(moduleTypes.map((t) => t.type));
-  const scoped = activeModule !== "all";
-
+export default async function Home() {
   const [stats, recentAll, awaitingReview, openQuestions, commitments, insights] = await Promise.all([
     getStats(),
-    listEntries({ limit: scoped ? 40 : 6 }),
+    // Fetch a wider window once; the module switcher filters this on the client
+    // instantly (no re-render of the whole server dashboard per switch).
+    listEntries({ limit: 30 }),
     decisionsAwaitingReview(),
     prisma.entry.findMany({
       where: { type: "question", status: "open" },
@@ -42,7 +37,17 @@ export default async function Home({ searchParams }: PageProps<"/">) {
     refreshInsights(),
   ]);
 
-  const recent = scoped ? recentAll.filter((e) => typeKeys.has(e.type)).slice(0, 6) : recentAll;
+  // Trim to just what the cards need (drops the embedding vector etc. from the payload).
+  const recent = recentAll.map((e) => ({
+    id: e.id,
+    type: e.type,
+    title: e.title,
+    summary: e.summary,
+    status: e.status,
+    confidence: e.confidence,
+    createdAt: e.createdAt,
+    tags: e.tags?.map((t) => ({ tag: { name: t.tag.name } })),
+  }));
   const dueNow = [...commitments.overdue, ...commitments.today];
   const insightItems = insights.map((i: InsightRow) => ({
     id: i.id,
@@ -59,6 +64,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
   });
 
   return (
+    <ModuleScopeProvider>
     <div className="animate-[fadeUp_0.4s_ease-out] space-y-10">
       {/* Hero */}
       <section className="ring-gradient elev relative overflow-hidden rounded-3xl border border-white/8 bg-white/[0.03] p-8 backdrop-blur-sm">
@@ -91,41 +97,18 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         </div>
       </section>
 
-      {/* Module switcher */}
-      <ModuleSwitcher active={activeModule} />
+      {/* Module switcher — instant client-side view filter */}
+      <ModuleSwitcher />
 
       {/* Area stats (scoped to the active module) */}
-      <StatGrid counts={stats.byType} types={moduleTypes} />
+      <StatGrid counts={stats.byType} />
 
       {/* Proactive intelligence */}
       <InsightFeed initial={insightItems} />
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_300px]">
-        {/* Recent */}
-        <section>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-zinc-100">
-              Recent{scoped ? ` · ${moduleById(activeModule)?.name ?? ""}` : ""}
-            </h2>
-            <Link href="/timeline" className="text-sm text-zinc-500 hover:text-zinc-300">
-              timeline →
-            </Link>
-          </div>
-          {recent.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-zinc-800 bg-zinc-900/30 p-10 text-center">
-              <p className="text-zinc-400">Nothing captured yet.</p>
-              <Link href="/capture" className="mt-2 inline-block text-sm font-medium text-violet-300 hover:underline">
-                Capture your first entry →
-              </Link>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {recent.map((entry) => (
-                <EntryCard key={entry.id} entry={entry} />
-              ))}
-            </div>
-          )}
-        </section>
+        {/* Recent — scoped instantly to the active module */}
+        <RecentEntries entries={recent} />
 
         {/* Side rail: nudges */}
         <aside className="space-y-6">
@@ -209,5 +192,6 @@ export default async function Home({ searchParams }: PageProps<"/">) {
         </aside>
       </div>
     </div>
+    </ModuleScopeProvider>
   );
 }
