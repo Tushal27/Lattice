@@ -246,7 +246,10 @@ npm run dev
    `GROQ_API_KEY`, etc.) → Deploy. Schema auto-creates; pushes to `main`
    auto-redeploy.
 3. Open the URL on your phone → **Add to Home Screen**.
-4. *(Optional)* **Web Push:** set `VAPID_PUBLIC_KEY` + `VAPID_PRIVATE_KEY`
+4. *(Optional)* **Semantic matching:** set `EMBEDDINGS_MODEL` (e.g.
+   `text-embedding-3-small`; base URL/key default to `AI_BASE_URL`/`AI_API_KEY`)
+   to power meaning-based MistakeWarning. Off → lexical (tag/word) matching.
+5. *(Optional)* **Web Push:** set `VAPID_PUBLIC_KEY` + `VAPID_PRIVATE_KEY`
    (generate with `npx web-push generate-vapid-keys`), optionally `VAPID_SUBJECT`
    (a `mailto:` URL) and `CRON_SECRET`. A Vercel Cron (`vercel.json`, daily 08:00)
    hits `/api/cron/notify` to send the digest. Skip this and the app uses in-app

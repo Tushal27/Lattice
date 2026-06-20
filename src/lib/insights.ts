@@ -6,6 +6,7 @@
 
 import { prisma } from "@/lib/db";
 import { decisionsAwaitingReview } from "@/lib/entries";
+import { cosine, ensureEmbeddings } from "@/lib/embeddings";
 
 const DAY = 86_400_000;
 
@@ -151,29 +152,42 @@ async function computeCandidates(): Promise<InsightCandidate[]> {
     return inter / (a.size + b.size - inter);
   };
 
-  const lessons = entries
-    .filter((e) => e.type === "lesson")
-    .map((l) => ({ l, tags: new Set(tagsOf(l)), tok: toks(`${l.title} ${l.summary ?? ""}`) }));
+  const lessonsAll = entries.filter((e) => e.type === "lesson");
+  const lessons = lessonsAll.map((l) => ({ l, tags: new Set(tagsOf(l)), tok: toks(`${l.title} ${l.summary ?? ""}`) }));
   const fresh = entries.filter((e) => now - e.createdAt.getTime() <= 7 * DAY && e.type !== "lesson");
+
+  // Semantic layer (optional). Embeds new entries + lessons once, then compares
+  // by cosine — catches contradictions that share meaning but not words. Falls
+  // back to the lexical signals when embeddings are disabled/unavailable.
+  const vec = await ensureEmbeddings([...fresh, ...lessonsAll]);
+  const SEM_THRESHOLD = Number(process.env.EMBEDDINGS_SIM_THRESHOLD) || 0.75;
+  const lexRel = (shared: number, text: number) => Math.min(1, (2 * shared + 3 * text) / 5);
 
   let warned = 0;
   for (const e of fresh) {
     if (warned >= 3) break;
     const eTags = new Set(tagsOf(e));
     const eTok = toks(`${e.title} ${e.summary ?? ""}`);
-    if (eTags.size === 0 && eTok.size === 0) continue;
+    const eVec = vec.get(e.id);
+    if (eTags.size === 0 && eTok.size === 0 && !eVec) continue;
 
-    let best: { l: (typeof entries)[number]; shared: number; text: number } | null = null;
+    let best: { l: (typeof entries)[number]; shared: number; text: number; sem: number } | null = null;
     for (const cand of lessons) {
       if (cand.l.createdAt.getTime() >= e.createdAt.getTime()) continue; // must be prior knowledge
       const shared = [...eTags].filter((t) => cand.tags.has(t)).length;
       const text = jaccard(eTok, cand.tok);
-      if (!best || 2 * shared + 3 * text > 2 * best.shared + 3 * best.text) best = { l: cand.l, shared, text };
+      const cVec = vec.get(cand.l.id);
+      const sem = eVec && cVec ? cosine(eVec, cVec) : 0;
+      const rel = Math.max(sem, lexRel(shared, text));
+      const bestRel = best ? Math.max(best.sem, lexRel(best.shared, best.text)) : -1;
+      if (!best || rel > bestRel) best = { l: cand.l, shared, text, sem };
     }
+    if (!best) continue;
 
-    // Fire on a clear tag link, or a tag + some wording overlap, or strong wording.
-    const fires = best && (best.shared >= 2 || (best.shared >= 1 && best.text > 0.05) || best.text >= 0.4);
-    if (best && fires) {
+    // Fire on a strong semantic match, a clear tag link, or strong wording overlap.
+    const semFire = best.sem >= SEM_THRESHOLD;
+    const lexFire = best.shared >= 2 || (best.shared >= 1 && best.text > 0.05) || best.text >= 0.4;
+    if (semFire || lexFire) {
       warned++;
       const snippet = best.l.summary ? ` — “${best.l.summary.slice(0, 90)}”` : "";
       out.push({

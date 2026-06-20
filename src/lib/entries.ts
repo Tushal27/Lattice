@@ -133,6 +133,7 @@ export async function updateEntry(id: string, input: EntryInput) {
         occurredAt: input.occurredAt ?? null,
         projectId: input.projectId ?? null,
         fields: JSON.stringify(input.fields ?? {}),
+        embedding: null, // text changed → recompute the semantic vector lazily
         tags: {
           create: tags.map((name) => ({
             tag: { connectOrCreate: { where: { name }, create: { name } } },

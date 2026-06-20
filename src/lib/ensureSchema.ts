@@ -15,6 +15,7 @@ const STATEMENTS = [
     "status" TEXT,
     "confidence" INTEGER,
     "fields" TEXT,
+    "embedding" TEXT,
     "occurredAt" DATETIME,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
@@ -85,6 +86,10 @@ const STATEMENTS = [
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "PushSubscription_endpoint_key" ON "PushSubscription"("endpoint")`,
+  // For databases created before the embedding column existed. SQLite has no
+  // "ADD COLUMN IF NOT EXISTS", so this throws "duplicate column" on an
+  // already-migrated DB — which the per-statement guard below swallows.
+  `ALTER TABLE "Entry" ADD COLUMN "embedding" TEXT`,
 ];
 
 let done: Promise<void> | null = null;
@@ -94,13 +99,18 @@ export function ensureSchema(): Promise<void> {
   if (!done) {
     done = (async () => {
       for (const sql of STATEMENTS) {
-        await prisma.$executeRawUnsafe(sql);
+        // Per-statement guard: every statement is idempotent, but some (like
+        // ALTER ADD COLUMN on an already-migrated DB) intentionally throw a
+        // harmless "duplicate column" — swallow it and keep going.
+        try {
+          await prisma.$executeRawUnsafe(sql);
+        } catch (err) {
+          const msg = String((err as Error)?.message ?? "");
+          if (/duplicate column|already exists/i.test(msg)) continue;
+          console.error("ensureSchema statement failed", msg);
+        }
       }
-    })().catch((err) => {
-      // Reset so a later request can retry, but never crash the server.
-      done = null;
-      console.error("ensureSchema failed", err);
-    });
+    })();
   }
   return done;
 }
