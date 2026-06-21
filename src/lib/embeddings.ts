@@ -30,12 +30,17 @@ export async function embed(texts: string[]): Promise<number[][] | null> {
   if (!embeddingsEnabled() || texts.length === 0) return null;
   const { urls, key, model } = config();
   if (urls.length === 0) return null;
+  // gemini-embedding-001 defaults to 3072 dims; request a compact, consistent
+  // size so vectors stay small and comparable. EMBEDDINGS_DIMENSIONS=0 omits it.
+  const dimsEnv = process.env.EMBEDDINGS_DIMENSIONS;
+  const dims = dimsEnv != null ? Number(dimsEnv) : 768;
+  const body = JSON.stringify({ model, input: texts, ...(dims > 0 ? { dimensions: dims } : {}) });
   for (const url of urls) {
     try {
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-        body: JSON.stringify({ model, input: texts }),
+        body,
         signal: AbortSignal.timeout(30_000),
       });
       if (!res.ok) {
@@ -88,6 +93,7 @@ export function simThreshold(): number {
   const override = Number(process.env.EMBEDDINGS_SIM_THRESHOLD);
   if (Number.isFinite(override) && override > 0) return override;
   const model = (process.env.EMBEDDINGS_MODEL || "").toLowerCase();
+  if (model.includes("gemini-embedding")) return 0.7;
   if (model.includes("004") || model.includes("multilingual") || model.includes("google")) return 0.68;
   if (model.includes("mistral")) return 0.7;
   if (model.includes("text-embedding-3")) return 0.78;
