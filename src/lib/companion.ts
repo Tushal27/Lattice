@@ -281,6 +281,7 @@ export async function classifyThought(text: string): Promise<Classification> {
     'Respond with ONLY a JSON object, no markdown, of the form:',
     '{"type":"decision|lesson|aha|question|project","title":"short clear title","summary":"one sentence","tags":["lowercase","tags"]}',
     "Pick the single best type. Keep the title under 12 words. 2-4 tags.",
+    "The thought may contain typos or speech-to-text errors — read for intent and write a clean, correctly-spelled title and summary.",
     "",
     `Thought: """${trimmed}"""`,
   ].join("\n");

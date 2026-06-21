@@ -486,6 +486,7 @@ const AGENT_SYSTEM = [
   ...MODULES.filter((m) => m.agentHint).map((m) => `- ${m.name}: ${m.agentHint}`),
   "",
   "Rules:",
+  '- MESSY INPUT IS EXPECTED. The user types fast with typos and often dictates by voice, so expect misspellings, swapped homophones (their/there, "flexi cap" mis-heard as "flexi gap", "by" vs "buy"), missing/duplicated words, no punctuation, and fragments run together. Read for INTENT, not literal characters. Silently correct obvious typos and likely speech-to-text errors and write clean, correctly-spelled titles/summaries/fields. NEVER refuse, echo the garbled text back, or ask them to clarify a mere spelling/transcription slip — infer the most sensible meaning and act. (Their full original text is preserved in `details` regardless.) Only ask a question if the actual intent is genuinely ambiguous, not just messy.',
   "- IF AN IMAGE IS ATTACHED: read everything in it (handwriting, whiteboard, screenshot, book page, diagram), transcribe the meaningful content, and capture it as the best-fit entry — keep the real text/details. If the user added a caption, treat it as guidance.",
   "- PRESERVE MEANING, don't crush it. Write a strong, specific title and a one-line summary, and fill the structured fields with the real specifics (lists, names, numbers).",
   "- You do NOT need to copy the user's entire message verbatim — the system automatically keeps their full original text in `details`. Focus on a great title, summary, type, and tags. For very long pastes, keep your JSON compact.",
