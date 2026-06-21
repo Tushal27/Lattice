@@ -30,7 +30,15 @@ export function EntryForm({ type, projects, initial, defaultValues, defaultTags,
   const cfg = TYPES[type];
   const a = accent(cfg.accent);
 
-  const [values, setValues] = useState<Record<string, string>>(initial?.values ?? defaultValues ?? {});
+  const [values, setValues] = useState<Record<string, string>>(() => {
+    const v = { ...(initial?.values ?? defaultValues ?? {}) };
+    // A select with no blank option must default to its first option, so what's
+    // shown matches what's saved (e.g. an investment defaults to "monthly").
+    for (const f of cfg.fields) {
+      if (f.kind === "select" && f.options && !f.options.includes("") && !v[f.key]) v[f.key] = f.options[0];
+    }
+    return v;
+  });
   const [tags, setTags] = useState(initial?.tags.join(", ") ?? defaultTags?.join(", ") ?? "");
   const [projectId, setProjectId] = useState(initial?.projectId ?? "");
   const [saving, setSaving] = useState(false);

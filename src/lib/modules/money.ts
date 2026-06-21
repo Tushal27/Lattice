@@ -72,7 +72,7 @@ const investment: TypeConfig = {
   fields: [
     { key: "title", label: "The investment", kind: "text", column: true, placeholder: "Flexi cap fund SIP" },
     { key: "amount", label: "Amount", kind: "number", placeholder: "1000", help: "Per installment for a SIP, or total for a lump sum." },
-    { key: "frequency", label: "Frequency", kind: "select", options: ["one-time", "monthly", "quarterly", "yearly"] },
+    { key: "frequency", label: "Frequency", kind: "select", options: ["monthly", "one-time", "quarterly", "yearly"] },
     { key: "thesis", label: "Thesis — why it'll pay off", kind: "textarea" },
     { key: "expectedReturn", label: "Expected annual return (%)", kind: "number", placeholder: "12", help: "Makes the thesis measurable and powers goal projections." },
     { key: "falsifier", label: "What would prove this wrong / make you exit", kind: "textarea", placeholder: "e.g. underperforms the index for 5 straight years" },

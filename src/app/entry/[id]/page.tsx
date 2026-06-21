@@ -79,15 +79,16 @@ export default async function EntryPage(props: PageProps<"/entry/[id]">) {
       select: { id: true, title: true, fields: true, status: true },
       orderBy: { createdAt: "desc" },
     });
-    const monthly = invs
+    const fundingInvestments = invs
       .filter((i) => i.status !== "exited")
-      .map((i) => ({ i, f: parseFields(i.fields) }))
-      .filter((x) => (x.f.frequency || "") === "monthly")
-      .map((x) => ({ id: x.i.id, title: x.i.title, amount: parseAmount(x.f.amount) }));
+      .map((i) => {
+        const f = parseFields(i.fields);
+        return { id: i.id, title: i.title, amount: parseAmount(f.amount), frequency: f.frequency || "one-time" };
+      });
     const initialLinked: Record<string, string> = {};
-    for (const m of monthly) if (linkedMap[m.id]) initialLinked[m.id] = linkedMap[m.id];
-    if (monthly.length > 0) {
-      goalFunding = <GoalFunding goalId={entry.id} investments={monthly} initialLinked={initialLinked} />;
+    for (const m of fundingInvestments) if (linkedMap[m.id]) initialLinked[m.id] = linkedMap[m.id];
+    if (fundingInvestments.length > 0) {
+      goalFunding = <GoalFunding goalId={entry.id} investments={fundingInvestments} initialLinked={initialLinked} />;
     }
   }
 

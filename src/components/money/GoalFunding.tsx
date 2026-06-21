@@ -10,6 +10,15 @@ interface Inv {
   id: string;
   title: string;
   amount: number;
+  frequency: string;
+}
+
+// Monthly-equivalent of a contribution (one-time counts as a lump, not monthly).
+function monthlyEquiv(inv: Inv): number {
+  if (inv.frequency === "monthly") return inv.amount;
+  if (inv.frequency === "quarterly") return inv.amount / 3;
+  if (inv.frequency === "yearly") return inv.amount / 12;
+  return 0;
 }
 
 // One-tap linking of monthly SIP investments to a goal. Linked SIPs' monthly
@@ -29,7 +38,7 @@ export function GoalFunding({
 
   if (investments.length === 0) return null;
 
-  const monthlyTotal = investments.filter((i) => linked[i.id]).reduce((s, i) => s + i.amount, 0);
+  const monthlyTotal = investments.filter((i) => linked[i.id]).reduce((s, i) => s + monthlyEquiv(i), 0);
 
   async function toggle(inv: Inv) {
     setBusy(inv.id);
@@ -81,7 +90,9 @@ export function GoalFunding({
             >
               <div className="min-w-0">
                 <p className="truncate text-sm text-zinc-200">{inv.title}</p>
-                <p className="tabnums text-[11px] text-zinc-500">{formatMoney(inv.amount)}/mo</p>
+                <p className="tabnums text-[11px] text-zinc-500">
+                  {formatMoney(inv.amount)} · {inv.frequency}
+                </p>
               </div>
               <button
                 onClick={() => toggle(inv)}

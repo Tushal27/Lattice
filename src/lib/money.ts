@@ -33,19 +33,31 @@ export async function goalsWithProjection(): Promise<ProjectedGoal[]> {
     prisma.connection.findMany({ select: { fromId: true, toId: true } }),
   ]);
 
-  const invMonthly = new Map<string, number>();
+  // Per active investment: its monthly-equivalent contribution, and any one-time
+  // lump (which counts toward "already saved", not a recurring contribution).
+  const invInfo = new Map<string, { monthly: number; lump: number }>();
   for (const inv of investments) {
     if (inv.status === "exited") continue;
     const f = parseFields(inv.fields);
-    if ((f.frequency || "") === "monthly") invMonthly.set(inv.id, parseAmount(f.amount));
+    const amount = parseAmount(f.amount);
+    const freq = f.frequency || "one-time";
+    if (freq === "monthly") invInfo.set(inv.id, { monthly: amount, lump: 0 });
+    else if (freq === "quarterly") invInfo.set(inv.id, { monthly: amount / 3, lump: 0 });
+    else if (freq === "yearly") invInfo.set(inv.id, { monthly: amount / 12, lump: 0 });
+    else invInfo.set(inv.id, { monthly: 0, lump: amount });
   }
-  const linkedMonthly = (goalId: string) => {
-    let sum = 0;
+  const linkedContrib = (goalId: string) => {
+    let monthly = 0;
+    let lump = 0;
     for (const c of connections) {
       const other = c.fromId === goalId ? c.toId : c.toId === goalId ? c.fromId : null;
-      if (other && invMonthly.has(other)) sum += invMonthly.get(other)!;
+      const info = other ? invInfo.get(other) : undefined;
+      if (info) {
+        monthly += info.monthly;
+        lump += info.lump;
+      }
     }
-    return sum;
+    return { monthly, lump };
   };
 
   return goals
@@ -53,10 +65,10 @@ export async function goalsWithProjection(): Promise<ProjectedGoal[]> {
     .map((g) => {
       const f = parseFields(g.fields);
       const target = parseAmount(f.amount);
-      const current = parseAmount(f.current);
       const explicit = parseAmount(f.monthly);
-      const linked = linkedMonthly(g.id);
-      const monthly = explicit || linked;
+      const { monthly: linkedM, lump: linkedLump } = linkedContrib(g.id);
+      const current = parseAmount(f.current) + linkedLump; // linked lump sums already saved
+      const monthly = explicit || linkedM;
       const annualReturnPct = parseAmount(f.expectedReturn) || (monthly > 0 ? 10 : 0);
       const deadline = f.deadline || null;
       return {
@@ -65,7 +77,7 @@ export async function goalsWithProjection(): Promise<ProjectedGoal[]> {
         target,
         current,
         monthly,
-        monthlyFromLink: !explicit && linked > 0,
+        monthlyFromLink: !explicit && linkedM > 0,
         deadline,
         pct: target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0,
         projection: projectGoal({ target, current, monthly, annualReturnPct, deadline }),
