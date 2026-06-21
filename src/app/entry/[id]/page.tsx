@@ -2,8 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ConnectionPanel, type ExistingConnection } from "@/components/entry/ConnectionPanel";
 import { EntryToolbar } from "@/components/entry/EntryToolbar";
+import { GoalFunding } from "@/components/money/GoalFunding";
 import { Card, TagChip, TypeBadge } from "@/components/ui";
+import { prisma } from "@/lib/db";
 import { entryToFormValues, getEntry, suggestConnections } from "@/lib/entries";
+import { parseAmount } from "@/lib/format";
 import { configFor } from "@/lib/types";
 import { accent, cn, formatDate, parseFields, relativeTime } from "@/lib/utils";
 
@@ -64,6 +67,29 @@ export default async function EntryPage(props: PageProps<"/entry/[id]">) {
   ];
 
   const suggestions = await suggestConnections(entry.id, 5);
+
+  // For a goal: offer one-tap linking of the monthly SIPs that fund it.
+  let goalFunding: React.ReactNode = null;
+  if (entry.type === "goal") {
+    const linkedMap: Record<string, string> = {};
+    for (const c of entry.connectionsFrom) linkedMap[c.to.id] = c.id;
+    for (const c of entry.connectionsTo) linkedMap[c.from.id] = c.id;
+    const invs = await prisma.entry.findMany({
+      where: { type: "investment" },
+      select: { id: true, title: true, fields: true, status: true },
+      orderBy: { createdAt: "desc" },
+    });
+    const monthly = invs
+      .filter((i) => i.status !== "exited")
+      .map((i) => ({ i, f: parseFields(i.fields) }))
+      .filter((x) => (x.f.frequency || "") === "monthly")
+      .map((x) => ({ id: x.i.id, title: x.i.title, amount: parseAmount(x.f.amount) }));
+    const initialLinked: Record<string, string> = {};
+    for (const m of monthly) if (linkedMap[m.id]) initialLinked[m.id] = linkedMap[m.id];
+    if (monthly.length > 0) {
+      goalFunding = <GoalFunding goalId={entry.id} investments={monthly} initialLinked={initialLinked} />;
+    }
+  }
 
   return (
     <div className="animate-[fadeUp_0.4s_ease-out]">
@@ -140,6 +166,8 @@ export default async function EntryPage(props: PageProps<"/entry/[id]">) {
               ))}
             </div>
           )}
+
+          {goalFunding}
 
           {needsReview && (
             <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
