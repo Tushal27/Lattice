@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { cosine, embeddingsEnabled, parseVector, simThreshold } from "@/lib/embeddings";
 import { configFor, isReviewable, reviewableTypeKeys, type EntryType } from "@/lib/types";
 import { parseFields } from "@/lib/utils";
 
@@ -283,6 +284,12 @@ export async function suggestConnections(entryId: string, limit = 5) {
   const tagNames = new Set(entry.tags.map((t) => t.tag.name));
   const words = keywords(`${entry.title} ${entry.summary ?? ""} ${Object.values(parseFields(entry.fields)).join(" ")}`);
 
+  // Prefer semantic similarity (cosine over stored vectors) when available; it's
+  // far more accurate than keyword overlap. Reads stored vectors only — no
+  // network on a page load; the cron backfills embeddings.
+  const qVec = embeddingsEnabled() ? parseVector(entry.embedding) : null;
+  const SUGGEST_SIM = Math.max(0.5, simThreshold() - 0.05);
+
   const candidates = await prisma.entry.findMany({
     include: { tags: { include: { tag: true } } },
     orderBy: { updatedAt: "desc" },
@@ -296,7 +303,17 @@ export async function suggestConnections(entryId: string, limit = 5) {
       const sharedTags = [...cTags].filter((t) => tagNames.has(t)).length;
       const cWords = keywords(`${c.title} ${c.summary ?? ""} ${Object.values(parseFields(c.fields)).join(" ")}`);
       const sharedWords = [...cWords].filter((w) => words.has(w)).length;
-      return { entry: c, score: sharedTags * 3 + sharedWords };
+
+      const cVec = qVec ? parseVector(c.embedding) : null;
+      const sem = qVec && cVec ? cosine(qVec, cVec) : null;
+
+      // A real semantic match ranks above any lexical one. Otherwise require a
+      // genuine signal — a shared tag, or 2+ shared meaningful words — so a
+      // single generic word ("care", "making") no longer drags in noise.
+      let score = 0;
+      if (sem != null && sem >= SUGGEST_SIM) score = 1 + sem;
+      else if (sharedTags >= 1 || sharedWords >= 2) score = (sharedTags * 3 + sharedWords) / 100;
+      return { entry: c, score };
     })
     .filter((s) => s.score > 0)
     .sort((a, b) => b.score - a.score)
