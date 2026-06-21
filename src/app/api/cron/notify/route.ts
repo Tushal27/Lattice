@@ -18,7 +18,8 @@ async function run(request: Request) {
     }
   }
 
-  const [insights, commitments] = await Promise.all([refreshInsights(), groupedCommitments()]);
+  // Cron does the heavy pass: force a recompute and allow embedding backfill.
+  const [insights, commitments] = await Promise.all([refreshInsights({ force: true, embed: true }), groupedCommitments()]);
   const due = commitments.overdue.length + commitments.today.length;
 
   let sent = 0;

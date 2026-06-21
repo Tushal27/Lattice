@@ -23,7 +23,7 @@ function greeting() {
 }
 
 export default async function Home() {
-  const [stats, recentAll, awaitingReview, openQuestions, commitments, insights] = await Promise.all([
+  const [stats, recentAll, awaitingReview, openQuestions, commitments, insights, money] = await Promise.all([
     getStats(),
     // Fetch a wider window once; the module switcher filters this on the client
     // instantly (no re-render of the whole server dashboard per switch).
@@ -37,9 +37,9 @@ export default async function Home() {
     }),
     groupedCommitments(),
     refreshInsights(),
+    moneyAnalytics("month"),
   ]);
 
-  const money = await moneyAnalytics("month");
   const moneyWidget = {
     spendTotal: money.spend.total,
     spendCount: money.spend.count,

@@ -23,7 +23,7 @@ export interface InsightCandidate {
 
 export type InsightRow = Awaited<ReturnType<typeof activeInsights>>[number];
 
-async function computeCandidates(): Promise<InsightCandidate[]> {
+async function computeCandidates(embed: boolean): Promise<InsightCandidate[]> {
   const now = Date.now();
   const out: InsightCandidate[] = [];
 
@@ -310,7 +310,10 @@ async function computeCandidates(): Promise<InsightCandidate[]> {
   // Semantic layer (optional). Embeds new entries + lessons once, then compares
   // by cosine — catches contradictions that share meaning but not words. Falls
   // back to the lexical signals when embeddings are disabled/unavailable.
-  const vec = await ensureEmbeddings([...fresh, ...lessonsAll]);
+  // Only make embedding network calls in the background pass (cron). On an
+  // interactive page load we read whatever vectors are already stored (max 0 =
+  // no network), so the dashboard never waits on the roster.
+  const vec = await ensureEmbeddings([...fresh, ...lessonsAll], embed ? 24 : 0);
   const SEM_THRESHOLD = simThreshold();
   const lexRel = (shared: number, text: number) => Math.min(1, (2 * shared + 3 * text) / 5);
 
@@ -357,13 +360,26 @@ async function computeCandidates(): Promise<InsightCandidate[]> {
   return out;
 }
 
+// Throttle: a warm server instance won't recompute more than once per window, so
+// rapidly navigating to/from the dashboard returns instantly from stored triggers.
+let lastRefresh = 0;
+const REFRESH_WINDOW_MS = 90_000;
+
 /**
  * Recompute triggers and reconcile with what's stored: create new ones, refresh
  * the text of active ones, never resurrect dismissed ones, and delete active
  * ones whose underlying condition no longer holds.
+ *
+ * `embed` (cron only) allows embedding network calls; interactive loads skip
+ * them and read stored vectors. `force` bypasses the throttle.
  */
-export async function refreshInsights() {
-  const candidates = await computeCandidates();
+export async function refreshInsights(opts: { embed?: boolean; force?: boolean } = {}) {
+  if (!opts.force && Date.now() - lastRefresh < REFRESH_WINDOW_MS) {
+    return activeInsights();
+  }
+  lastRefresh = Date.now();
+
+  const candidates = await computeCandidates(opts.embed ?? false);
   const validKeys = candidates.map((c) => c.key);
 
   for (const c of candidates) {
