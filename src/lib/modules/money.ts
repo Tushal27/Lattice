@@ -69,14 +69,15 @@ const investment: TypeConfig = {
   intro: "Money put to work — with the thesis for why it'll pay off, so you can grade the thinking later.",
   reviewable: true,
   fields: [
-    { key: "title", label: "The investment", kind: "text", column: true, placeholder: "Index fund SIP" },
-    { key: "amount", label: "Amount invested", kind: "number", placeholder: "10000" },
+    { key: "title", label: "The investment", kind: "text", column: true, placeholder: "Flexi cap fund SIP" },
+    { key: "amount", label: "Amount", kind: "number", placeholder: "1000", help: "Per installment for a SIP, or total for a lump sum." },
+    { key: "frequency", label: "Frequency", kind: "select", options: ["one-time", "monthly", "quarterly", "yearly"] },
     { key: "thesis", label: "Thesis — why it'll pay off", kind: "textarea" },
     { key: "horizon", label: "Time horizon", kind: "select", options: ["", "<1 year", "1–3 years", "3–10 years", "10+ years"] },
     { key: "risk", label: "Risk level", kind: "select", options: ["", "Low", "Medium", "High"] },
     { key: "status", label: "Status", kind: "select", column: true, options: ["active", "exited"] },
     { key: "summary", label: "One-line summary", kind: "text", column: true },
-    { key: "occurredAt", label: "Date", kind: "date", column: true },
+    { key: "occurredAt", label: "Started", kind: "date", column: true },
     { key: "details", label: "Details", kind: "textarea" },
     { key: "reviewOutcome", label: "How it played out", kind: "textarea", review: true, placeholder: "Review later" },
     { key: "reviewVerdict", label: "Did the thesis hold?", kind: "select", review: true, options: ["", "Right call", "Mixed", "Wrong call", "Too early to tell"] },
@@ -114,5 +115,5 @@ export const moneyModule: ModuleConfig = {
   tagline: "Spending, decisions, and investments — judged by the life value they create.",
   types: [financialDecision, expense, investment, goal],
   agentHint:
-    "Money capture — always extract the amount. A significant money choice to grade later (confidence + expected value) → financial-decision; everyday spending worth remembering (capture satisfaction if the user implies it) → expense; money put to work with a thesis (SIP, stock, fund, education, business) → investment; a savings target → goal. A money *lesson* learned is a core `lesson` tagged money — not a money type. Keep follow-up questions minimal.",
+    "Money capture — always extract the amount. A significant money choice to grade later (confidence + expected value) → financial-decision; everyday spending worth remembering (capture satisfaction if the user implies it) → expense; money put to work with a thesis (SIP, stock, fund, education, business) → investment; a savings target → goal. For investments: create ONE entry PER fund/asset (e.g. flexi cap and small cap are two investments), set frequency=monthly for a monthly SIP with amount = the monthly installment, and capture the thesis. A money *lesson* learned is a core `lesson` tagged money — not a money type. Keep follow-up questions minimal.",
 };
