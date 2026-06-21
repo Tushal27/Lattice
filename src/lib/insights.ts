@@ -321,10 +321,12 @@ async function computeCandidates(): Promise<InsightCandidate[]> {
     }
     if (!best) continue;
 
-    // Fire on a strong semantic match, a clear tag link, or strong wording overlap.
-    const semFire = best.sem >= SEM_THRESHOLD;
-    const lexFire = best.shared >= 2 || (best.shared >= 1 && best.text > 0.05) || best.text >= 0.4;
-    if (semFire || lexFire) {
+    // High precision matters — a wrong "you've been here before" erodes trust.
+    // When the new entry is embedded, trust semantics (or a strong 2+ tag link);
+    // only fall back to strict lexical when there's no vector to compare.
+    const hasSem = eVec != null && best.sem > 0;
+    const fires = hasSem ? best.sem >= SEM_THRESHOLD || best.shared >= 2 : best.shared >= 2 || best.text >= 0.5;
+    if (fires) {
       warned++;
       const snippet = best.l.summary ? ` — “${best.l.summary.slice(0, 90)}”` : "";
       out.push({
