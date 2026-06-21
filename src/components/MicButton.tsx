@@ -13,6 +13,7 @@ interface RecognitionResultLike {
 }
 interface RecognitionEventLike {
   results: ArrayLike<RecognitionResultLike>;
+  resultIndex: number;
 }
 interface RecognitionLike {
   lang: string;
@@ -48,6 +49,7 @@ export function MicButton({
   const [listening, setListening] = useState(false);
   const recRef = useRef<RecognitionLike | null>(null);
   const baseRef = useRef("");
+  const finalRef = useRef("");
 
   useEffect(() => {
     // Capability detection must run on the client (window is undefined on the
@@ -74,10 +76,18 @@ export function MicButton({
     rec.interimResults = true;
     rec.continuous = true;
     baseRef.current = value.trim() ? value.trim() + " " : "";
+    finalRef.current = "";
     rec.onresult = (e) => {
-      let transcript = "";
-      for (let i = 0; i < e.results.length; i++) transcript += e.results[i][0].transcript;
-      onChange(baseRef.current + transcript);
+      // Accumulate only finalized results (once, into a ref); show the current
+      // interim chunk transiently. Iterating from resultIndex avoids re-adding
+      // earlier results, which is what caused "III wantI want to…" duplication.
+      let interim = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const r = e.results[i];
+        if (r.isFinal) finalRef.current += r[0].transcript;
+        else interim += r[0].transcript;
+      }
+      onChange((baseRef.current + finalRef.current + interim).replace(/\s+/g, " ").trimStart());
     };
     rec.onend = () => setListening(false);
     rec.onerror = () => setListening(false);
