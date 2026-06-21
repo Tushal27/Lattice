@@ -7,7 +7,7 @@
 import { prisma } from "@/lib/db";
 import { decisionsAwaitingReview } from "@/lib/entries";
 import { cosine, ensureEmbeddings, simThreshold } from "@/lib/embeddings";
-import { parseAmount, valueScore } from "@/lib/money";
+import { formatMoney, moneyGoalRisks, parseAmount, valueScore } from "@/lib/money";
 import { parseFields } from "@/lib/utils";
 
 const DAY = 86_400_000;
@@ -251,24 +251,38 @@ async function computeCandidates(): Promise<InsightCandidate[]> {
     });
   }
 
-  // Goal drift: an active goal behind pace with the deadline near.
+  // Goal risk: the compound-growth projection says you'll miss the target on
+  // your current trajectory — far smarter than a naive percent-funded check.
+  const risks = await moneyGoalRisks();
+  for (const g of risks.slice(0, 3)) {
+    out.push({
+      key: `goal-risk:${g.id}`,
+      type: "GoalRisk",
+      title: `Off track: ${g.title}`,
+      body: `At ${formatMoney(g.monthly)}/mo you'll reach about ${formatMoney(g.projection.projectedValue)} by the deadline — short of ${formatMoney(g.target)}. Step up to ${formatMoney(g.projection.requiredMonthly)}/mo to hit it.`,
+      entityId: g.id,
+      priority: 52,
+    });
+  }
+
+  // Overconfidence: high-confidence money calls that turned out wrong.
+  let highConfReviewed = 0;
+  let highConfWrong = 0;
   for (const { e, f } of money) {
-    if (e.type !== "goal" || (e.status ?? "active") !== "active") continue;
-    const target = parseAmount(f.amount);
-    const current = parseAmount(f.current);
-    const pct = target > 0 ? (current / target) * 100 : 0;
-    const deadline = f.deadline ? new Date(f.deadline).getTime() : 0;
-    const daysLeft = deadline ? (deadline - now) / DAY : Infinity;
-    if (deadline && daysLeft > 0 && daysLeft < 45 && pct < 60) {
-      out.push({
-        key: `goal-drift:${e.id}`,
-        type: "GoalDrift",
-        title: `Behind on: ${e.title}`,
-        body: `${Math.round(pct)}% funded with ~${Math.round(daysLeft)} days left. Bump the contribution or move the date.`,
-        entityId: e.id,
-        priority: 46,
-      });
-    }
+    if (e.type !== "financial-decision" && e.type !== "investment") continue;
+    if (!f.reviewVerdict || e.confidence == null || e.confidence < 70) continue;
+    highConfReviewed++;
+    if (f.reviewVerdict === "Wrong call") highConfWrong++;
+  }
+  if (highConfReviewed >= 3 && highConfWrong >= 2) {
+    out.push({
+      key: "overconfidence:money",
+      type: "Overconfidence",
+      title: "Your confident money calls miss",
+      body: `${highConfWrong} of your ${highConfReviewed} high-confidence financial calls turned out wrong. Add a margin of safety when you feel most sure.`,
+      entityId: null,
+      priority: 62,
+    });
   }
 
   // 7. Mistake warning: a NEW entry that echoes a PRIOR lesson. Matches on shared

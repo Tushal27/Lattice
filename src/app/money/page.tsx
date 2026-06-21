@@ -3,7 +3,7 @@ import { MoneyGoals } from "@/components/money/MoneyGoals";
 import { MoneyReflection } from "@/components/money/MoneyReflection";
 import { QuickSpend } from "@/components/money/QuickSpend";
 import { Card, EmptyState, PageHeader, TypeBadge } from "@/components/ui";
-import { moneyAnalytics, formatMoney, type MoneyPeriod } from "@/lib/money";
+import { goalsWithProjection, moneyAnalytics, formatMoney, type MoneyPeriod } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -26,9 +26,10 @@ export default async function MoneyPage(props: PageProps<"/money">) {
   const sp = await props.searchParams;
   const period = (typeof sp.period === "string" ? sp.period : "month") as MoneyPeriod;
   const a = await moneyAnalytics(PERIODS.some((p) => p.id === period) ? period : "month");
+  const goals = await goalsWithProjection();
 
   const empty =
-    a.spend.count === 0 && !a.best && !a.worst && a.investments.count === 0 && a.goals.length === 0 && a.awaitingReview === 0;
+    a.spend.count === 0 && !a.best && !a.worst && a.investments.count === 0 && goals.length === 0 && a.awaitingReview === 0;
 
   return (
     <div className="animate-[fadeUp_0.4s_ease-out] space-y-8">
@@ -91,7 +92,7 @@ export default async function MoneyPage(props: PageProps<"/money">) {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Stat label="Remembered spend" value={formatMoney(a.spend.total)} sub={`${a.spend.count} logged`} accent="text-rose-300" />
             <Stat label="Invested (active)" value={formatMoney(a.investments.total)} sub={`${a.investments.count} holdings`} accent="text-emerald-300" />
-            <Stat label="Goals" value={String(a.goals.length)} sub="in progress" accent="text-cyan-300" />
+            <Stat label="Goals" value={String(goals.length)} sub="in progress" accent="text-cyan-300" />
             <Link href="/review" className="block">
               <Stat label="Awaiting review" value={String(a.awaitingReview)} sub="ready to judge →" accent="text-amber-300" />
             </Link>
@@ -133,7 +134,7 @@ export default async function MoneyPage(props: PageProps<"/money">) {
           )}
 
           {/* Goals — with one-tap contributions */}
-          {a.goals.length > 0 && <MoneyGoals goals={a.goals} />}
+          {goals.length > 0 && <MoneyGoals goals={goals} />}
         </>
       )}
     </div>

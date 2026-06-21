@@ -5,14 +5,44 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/Toast";
 import { Card } from "@/components/ui";
-import { formatMoney } from "@/lib/format";
+import { formatMoney, type GoalProjection } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 export interface GoalDTO {
   id: string;
   title: string;
   current: number;
   target: number;
+  monthly: number;
+  monthlyFromLink: boolean;
   pct: number;
+  projection: GoalProjection;
+}
+
+function ProjectionLine({ g }: { g: GoalDTO }) {
+  const p = g.projection;
+  if (!p.hasDeadline) return <p className="mt-1.5 text-[11px] text-zinc-500">Add a deadline to see if you&apos;re on track.</p>;
+  if (g.monthly <= 0)
+    return <p className="mt-1.5 text-[11px] text-zinc-500">Add a monthly amount (or link a SIP) to project.</p>;
+
+  const tone =
+    p.status === "behind" ? "text-amber-300" : p.status === "ahead" ? "text-emerald-300" : "text-emerald-300/90";
+  const label = p.status === "behind" ? "Behind" : p.status === "ahead" ? "Ahead" : "On track";
+  return (
+    <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
+      <span className={cn("font-medium", tone)}>{label}</span> · projected{" "}
+      <span className="tabnums text-zinc-300">{formatMoney(p.projectedValue)}</span> by deadline (
+      {Math.round(p.onTrackPct)}% of target) at {formatMoney(g.monthly)}/mo
+      {g.monthlyFromLink ? " from linked SIPs" : ""}
+      {p.status === "behind" && p.requiredMonthly > 0 && (
+        <>
+          {" "}
+          · need <span className="tabnums text-amber-200">{formatMoney(p.requiredMonthly)}/mo</span> to hit it
+        </>
+      )}
+      .
+    </p>
+  );
 }
 
 export function MoneyGoals({ goals }: { goals: GoalDTO[] }) {
@@ -85,6 +115,7 @@ export function MoneyGoals({ goals }: { goals: GoalDTO[] }) {
             <div className="h-2 overflow-hidden rounded-full bg-white/5">
               <div className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-emerald-500" style={{ width: `${g.pct}%` }} />
             </div>
+            <ProjectionLine g={g} />
             <div className="mt-2 flex items-center gap-2">
               {openId === g.id ? (
                 <>

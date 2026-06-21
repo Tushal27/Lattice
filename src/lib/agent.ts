@@ -198,14 +198,19 @@ export async function runAgent(
   // captured and the user didn't already set a commitment this turn.
   let suggestion: SuggestedCommitment | undefined;
   const madeCommitment = steps.some((s) => s.tool === "create_commitment" && s.ok);
+  const SUGGESTABLE = new Set(["decision", "financial-decision", "question", "investment"]);
   const actionable = steps.find(
-    (s) => s.tool === "create_entry" && s.ok && s.entryId && (s.entryType === "decision" || s.entryType === "question"),
+    (s) => s.tool === "create_entry" && s.ok && s.entryId && s.entryType && SUGGESTABLE.has(s.entryType),
   );
   if (actionable && !madeCommitment) {
-    suggestion =
-      actionable.entryType === "decision"
-        ? { title: `Review decision: ${actionable.entryTitle}`, due: "in 14 days", sourceType: "decision", sourceId: actionable.entryId! }
-        : { title: `Research: ${actionable.entryTitle}`, due: "in 7 days", sourceType: "question", sourceId: actionable.entryId! };
+    const t = actionable.entryType;
+    if (t === "question") {
+      suggestion = { title: `Research: ${actionable.entryTitle}`, due: "in 7 days", sourceType: "question", sourceId: actionable.entryId! };
+    } else if (t === "investment") {
+      suggestion = { title: `Review thesis: ${actionable.entryTitle}`, due: "in 1 year", sourceType: "investment", sourceId: actionable.entryId! };
+    } else {
+      suggestion = { title: `Review decision: ${actionable.entryTitle}`, due: "in 14 days", sourceType: t!, sourceId: actionable.entryId! };
+    }
   }
 
   return {

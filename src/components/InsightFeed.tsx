@@ -28,6 +28,8 @@ const STYLE: Record<string, { icon: string; accent: string; chip: string }> = {
   PositiveROIPattern: { icon: "📈", accent: "border-emerald-500/25 bg-emerald-500/5", chip: "text-emerald-300" },
   SpendingDrift: { icon: "📉", accent: "border-amber-500/25 bg-amber-500/5", chip: "text-amber-300" },
   GoalDrift: { icon: "🪙", accent: "border-cyan-500/25 bg-cyan-500/5", chip: "text-cyan-300" },
+  GoalRisk: { icon: "🎯", accent: "border-amber-500/25 bg-amber-500/5", chip: "text-amber-300" },
+  Overconfidence: { icon: "⚖️", accent: "border-rose-500/25 bg-rose-500/5", chip: "text-rose-300" },
 };
 
 const LABEL: Record<string, string> = {
@@ -43,6 +45,8 @@ const LABEL: Record<string, string> = {
   PositiveROIPattern: "Pays off",
   SpendingDrift: "Drift",
   GoalDrift: "Goal",
+  GoalRisk: "Off track",
+  Overconfidence: "Overconfidence",
 };
 
 const MONEY_PATTERN_TYPES = new Set(["RegretPattern", "PositiveROIPattern", "SpendingDrift"]);
@@ -51,7 +55,7 @@ function hrefFor(i: InsightDTO): string | null {
   if (i.type === "DecisionReviewReady" && i.entityId) return `/entry/${i.entityId}/edit`;
   if (i.entityId) return `/entry/${i.entityId}`;
   if (MONEY_PATTERN_TYPES.has(i.type)) return "/money";
-  if (i.type === "RepeatedPattern" || i.type === "EmergingInterest") return "/patterns";
+  if (i.type === "RepeatedPattern" || i.type === "EmergingInterest" || i.type === "Overconfidence") return "/patterns";
   return null;
 }
 

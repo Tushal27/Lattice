@@ -95,6 +95,15 @@ const MONEY_PERIOD_LABEL: Record<MoneyPeriod, string> = {
   all: "all time",
 };
 
+// Each horizon asks a different question — the longer the lens, the more it's
+// about judgment and behaviour rather than transactions.
+const MONEY_FOCUS: Record<MoneyPeriod, string> = {
+  month: "Focus on what created value vs. regret this month, and any spending drift.",
+  quarter: "Focus on which financial beliefs/assumptions changed this quarter and why.",
+  year: "Focus on the highest-ROI decisions, the wealth-building behaviours that worked, and the lessons that mattered most.",
+  all: "Focus on the through-lines: what consistently works for me, what mistakes I keep repeating, and how my financial judgment has improved.",
+};
+
 /**
  * A financial-judgment reflection — not accounting. Surfaces the best money, the
  * most regretted, ROI patterns, and beliefs proven right/wrong, so spending
@@ -127,7 +136,7 @@ export async function moneyReflection(period: MoneyPeriod): Promise<SourcedText>
     goals ? `\nGoals:\n${goals}` : "",
     a.awaitingReview ? `\n${a.awaitingReview} financial decisions/investments are old enough to grade but unreviewed.` : "",
     "",
-    "In short markdown sections, be my financial-judgment coach:",
+    `In short markdown sections, be my financial-judgment coach. ${MONEY_FOCUS[period] ?? ""}`,
     "1. **Best money** — the spend/decision that most improved my life, and why.",
     "2. **Most regretted** — and the pattern behind it.",
     "3. **Where money buys me the most life** — the highest-ROI category/theme to lean into.",

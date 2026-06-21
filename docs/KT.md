@@ -59,8 +59,20 @@ cross-connect, and the graph/search/insights span all of them.
   - **Headline stats** — remembered spend, invested, goals, awaiting review.
   - **Best vs most-regretted**, **ROI by category**, and **Goals with one-tap
     contributions** (＋ add, or 🔔 set a monthly contribution commitment).
+  - **Goal planning (projection engine):** a compound-growth projection shows,
+    per goal, whether your current/linked monthly contribution + assumed return
+    will hit the target by the deadline — ahead / on-track / behind, plus the
+    **monthly needed** to hit it. Monthly is the goal's `monthly` field or the
+    sum of **SIPs you link to it** in the graph.
+  - **Investment intelligence:** investments capture `expectedReturn` (a
+    measurable thesis) and a **falsifier** ("what would prove this wrong / make
+    you exit"); the agent suggests a **thesis review in 1 year**.
   - **Insights**: regret patterns, subscription waste, positive-ROI categories,
-    spending drift, goal drift.
+    spending drift, **GoalRisk** (projection says you'll miss the target →
+    suggests a new monthly), **Overconfidence** (high-confidence money calls that
+    turned out wrong).
+  - **Reflection** is horizon-aware (month = value/regret, quarter = beliefs
+    changed, year = highest-ROI + behaviours, all = through-lines & judgment).
   - Financial decisions & investments flow through the same review +
     judgment-calibration engine as decisions. Currency via `LATTICE_CURRENCY`
     /`LATTICE_LOCALE` (default ₹ / en-IN).

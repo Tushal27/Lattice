@@ -3,10 +3,81 @@
 // satisfaction live in the entry `fields` JSON and are parsed here.
 
 import { prisma } from "@/lib/db";
-import { parseAmount } from "@/lib/format";
+import { parseAmount, projectGoal, type GoalProjection } from "@/lib/format";
 import { parseFields } from "@/lib/utils";
 
 export { formatMoney, parseAmount } from "@/lib/format";
+export type { GoalProjection } from "@/lib/format";
+
+export interface ProjectedGoal {
+  id: string;
+  title: string;
+  target: number;
+  current: number;
+  monthly: number;
+  monthlyFromLink: boolean;
+  deadline: string | null;
+  pct: number;
+  projection: GoalProjection;
+}
+
+/**
+ * Goals with a compound-growth projection. The monthly contribution is the
+ * goal's explicit `monthly` field, or — failing that — the sum of monthly SIP
+ * investments LINKED to the goal in the graph, so connections carry real meaning.
+ */
+export async function goalsWithProjection(): Promise<ProjectedGoal[]> {
+  const [goals, investments, connections] = await Promise.all([
+    prisma.entry.findMany({ where: { type: "goal" }, select: { id: true, title: true, fields: true, status: true } }),
+    prisma.entry.findMany({ where: { type: "investment" }, select: { id: true, fields: true, status: true } }),
+    prisma.connection.findMany({ select: { fromId: true, toId: true } }),
+  ]);
+
+  const invMonthly = new Map<string, number>();
+  for (const inv of investments) {
+    if (inv.status === "exited") continue;
+    const f = parseFields(inv.fields);
+    if ((f.frequency || "") === "monthly") invMonthly.set(inv.id, parseAmount(f.amount));
+  }
+  const linkedMonthly = (goalId: string) => {
+    let sum = 0;
+    for (const c of connections) {
+      const other = c.fromId === goalId ? c.toId : c.toId === goalId ? c.fromId : null;
+      if (other && invMonthly.has(other)) sum += invMonthly.get(other)!;
+    }
+    return sum;
+  };
+
+  return goals
+    .filter((g) => (g.status ?? "active") === "active")
+    .map((g) => {
+      const f = parseFields(g.fields);
+      const target = parseAmount(f.amount);
+      const current = parseAmount(f.current);
+      const explicit = parseAmount(f.monthly);
+      const linked = linkedMonthly(g.id);
+      const monthly = explicit || linked;
+      const annualReturnPct = parseAmount(f.expectedReturn) || (monthly > 0 ? 10 : 0);
+      const deadline = f.deadline || null;
+      return {
+        id: g.id,
+        title: g.title,
+        target,
+        current,
+        monthly,
+        monthlyFromLink: !explicit && linked > 0,
+        deadline,
+        pct: target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0,
+        projection: projectGoal({ target, current, monthly, annualReturnPct, deadline }),
+      };
+    });
+}
+
+/** Goals that, on current trajectory, will miss their target by the deadline. */
+export async function moneyGoalRisks(): Promise<ProjectedGoal[]> {
+  const goals = await goalsWithProjection();
+  return goals.filter((g) => g.projection.status === "behind" && g.projection.monthsLeft > 0 && g.monthly > 0);
+}
 
 export const MONEY_TYPES = ["financial-decision", "expense", "investment", "goal"];
 
