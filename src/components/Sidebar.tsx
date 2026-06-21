@@ -13,6 +13,7 @@ const primary = [
 ];
 
 const discover = [
+  { href: "/money", label: "Money Review", icon: "💰" },
   { href: "/learn", label: "Test Me", icon: "🎯" },
   { href: "/graph", label: "Knowledge Graph", icon: "🕸️" },
   { href: "/timeline", label: "Life Timeline", icon: "🧭" },

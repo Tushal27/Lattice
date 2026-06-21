@@ -99,6 +99,7 @@ export function CommandPalette() {
     { id: "nav-graph", label: "Knowledge Graph", icon: "🕸️", run: () => go("/graph"), keywords: "network connections lattice" },
     { id: "nav-review", label: "Daily Review", icon: "☀️", run: () => go("/review"), keywords: "resurface on this day" },
     { id: "nav-commitments", label: "Commitments", icon: "🎯", run: () => go("/commitments"), keywords: "reminders tasks follow through habits due" },
+    { id: "nav-money", label: "Money Review", icon: "💰", run: () => go("/money"), keywords: "finance spending expenses roi budget investment worth it" },
     { id: "nav-patterns", label: "Patterns", icon: "📊", run: () => go("/patterns"), keywords: "insights trends calibration" },
     { id: "nav-reflect", label: "Reflections", icon: "🔮", run: () => go("/reflect"), keywords: "weekly monthly" },
     {

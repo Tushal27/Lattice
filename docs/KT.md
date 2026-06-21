@@ -46,6 +46,15 @@ cross-connect, and the graph/search/insights span all of them.
 - **Engineering OS**: `incident` (🔥), `architecture`/ADR (🏛️), `bug`/debug log
   (🪲), `snippet`/pattern (🧩) — plus engineering insights (an ADR stuck in
   "proposed", an incident with no prevention follow-up).
+- **Money OS**: optimizes for *financial judgment*, not bookkeeping. Types:
+  `financial-decision` (🏦, reviewable), `expense` (🧾, with a satisfaction
+  signal), `investment` (📈, reviewable), `goal` (🪙). Money *lessons* are core
+  Lessons tagged #money. The **`/money` Money Review** answers "did spending
+  improve my life?" — remembered spend, best vs most-regretted, ROI by category,
+  goals — over month/quarter/year. Insights: regret patterns, subscription
+  waste, positive-ROI categories, spending drift, goal drift. Financial
+  decisions & investments flow through the same review + judgment-calibration
+  engine as decisions.
 
 The **dashboard module switcher** (All / Personal / Engineering …) scopes the
 stats and recent list to one lens without siloing data. Area lists live at

@@ -8,6 +8,7 @@
 // Entry-type keys are dynamic now (modules add their own), so this is a string
 // alias rather than a fixed union — runtime guards (isEntryType) keep it honest.
 import { engineeringModule } from "@/lib/modules/engineering";
+import { moneyModule } from "@/lib/modules/money";
 
 export type EntryType = string;
 
@@ -37,6 +38,9 @@ export interface TypeConfig {
   tagline: string;
   /** Prompt shown above the capture form. */
   intro: string;
+  /** Reviewable types gain Expected-vs-Actual review, awaiting-review nudges, and
+   * judgment calibration (decisions, financial decisions, investments…). */
+  reviewable?: boolean;
   fields: FieldDef[];
 }
 
@@ -49,6 +53,7 @@ const decision: TypeConfig = {
   accent: "amber",
   tagline: "Record choices now, judge them later.",
   intro: "Capture the thinking behind an important choice so future-you can grade the call.",
+  reviewable: true,
   fields: [
     { key: "title", label: "The decision", kind: "text", column: true, placeholder: "Take the new job at..." },
     { key: "summary", label: "One-line summary", kind: "text", column: true, placeholder: "Why, in a sentence" },
@@ -169,7 +174,7 @@ export const coreModule: ModuleConfig = {
 };
 
 // Registered modules. Adding one here lights it up everywhere — one shared brain.
-export const MODULES: ModuleConfig[] = [coreModule, engineeringModule];
+export const MODULES: ModuleConfig[] = [coreModule, engineeringModule, moneyModule];
 
 export const TYPE_LIST: TypeConfig[] = MODULES.flatMap((m) => m.types);
 
@@ -188,6 +193,15 @@ export function isEntryType(value: string): value is EntryType {
 
 export function configFor(type: string): TypeConfig | undefined {
   return TYPES[type];
+}
+
+/** Entry-type keys that support the review (Expected-vs-Actual) lifecycle. */
+export function reviewableTypeKeys(): string[] {
+  return TYPE_LIST.filter((t) => t.reviewable).map((t) => t.type);
+}
+
+export function isReviewable(type: string): boolean {
+  return Boolean(TYPES[type]?.reviewable);
 }
 
 export function moduleForType(type: string): ModuleConfig | undefined {

@@ -7,6 +7,8 @@
 import { prisma } from "@/lib/db";
 import { decisionsAwaitingReview } from "@/lib/entries";
 import { cosine, ensureEmbeddings } from "@/lib/embeddings";
+import { parseAmount, valueScore } from "@/lib/money";
+import { parseFields } from "@/lib/utils";
 
 const DAY = 86_400_000;
 
@@ -160,6 +162,113 @@ async function computeCandidates(): Promise<InsightCandidate[]> {
       entityId: e.id,
       priority: 55,
     });
+  }
+
+  // 6c. Money OS triggers — financial judgment, not bookkeeping.
+  const money = entries
+    .filter((e) => ["expense", "financial-decision", "investment", "goal"].includes(e.type))
+    .map((e) => ({ e, f: parseFields(e.fields), when: (e.occurredAt ?? e.createdAt).getTime() }));
+  const expenses = money.filter((m) => m.e.type === "expense");
+
+  // Subscription waste: recurring spend that's regretted, meh, or never judged.
+  let subs = 0;
+  for (const { e, f } of expenses) {
+    if (subs >= 3) break;
+    if (f.recurring !== "monthly" && f.recurring !== "yearly") continue;
+    const sat = f.satisfaction;
+    const ageDays = (now - e.createdAt.getTime()) / DAY;
+    if (sat === "Regret" || sat === "Meh" || (!sat && ageDays > 30)) {
+      subs++;
+      out.push({
+        key: `sub-waste:${e.id}`,
+        type: "SubscriptionWaste",
+        title: `Still worth it? ${e.title}`,
+        body: `A recurring ${f.recurring} expense${sat ? ` you rated "${sat}"` : " you haven't judged"}. Cancel or recommit.`,
+        entityId: e.id,
+        priority: 50,
+      });
+    }
+  }
+
+  // Regret pattern: repeated regret in the same category.
+  const regretByCat = new Map<string, number>();
+  for (const { f } of expenses) {
+    if (f.satisfaction === "Regret") regretByCat.set(f.category || "Uncategorized", (regretByCat.get(f.category || "Uncategorized") ?? 0) + 1);
+  }
+  for (const [cat, n] of regretByCat) {
+    if (n >= 2) {
+      out.push({
+        key: `regret:${cat}`,
+        type: "RegretPattern",
+        title: `A regret pattern: ${cat}`,
+        body: `You've regretted ${n} purchases in ${cat}. Worth naming the trigger before the next one.`,
+        entityId: null,
+        priority: 58,
+      });
+    }
+  }
+
+  // Positive ROI: a category that consistently feels worth it.
+  const roiByCat = new Map<string, { sum: number; count: number }>();
+  for (const { e, f } of expenses) {
+    const s = valueScore(e.type, f);
+    if (s == null) continue;
+    const c = roiByCat.get(f.category || "Uncategorized") ?? { sum: 0, count: 0 };
+    c.sum += s;
+    c.count++;
+    roiByCat.set(f.category || "Uncategorized", c);
+  }
+  for (const [cat, c] of roiByCat) {
+    if (c.count >= 3 && c.sum / c.count >= 1) {
+      out.push({
+        key: `roi:${cat}`,
+        type: "PositiveROIPattern",
+        title: `${cat} keeps paying off`,
+        body: `Spending on ${cat} consistently feels worth it. This is where more money buys more life — lean in.`,
+        entityId: null,
+        priority: 28,
+      });
+    }
+  }
+
+  // Spending drift: this 30-day window well above the prior three.
+  const win = [0, 0, 0, 0];
+  for (const { e, f, when } of expenses) {
+    void e;
+    const w = Math.floor((now - when) / (30 * DAY));
+    if (w >= 0 && w < 4) win[w] += parseAmount(f.amount);
+  }
+  const prevAvg = (win[1] + win[2] + win[3]) / 3;
+  if (win[0] > 0 && prevAvg > 0 && win[0] > 1.5 * prevAvg) {
+    const d = new Date();
+    out.push({
+      key: `spend-drift:${d.getUTCFullYear()}-${d.getUTCMonth()}`,
+      type: "SpendingDrift",
+      title: "Spending is drifting up",
+      body: "Your remembered spending this month is well above your recent norm. Worth a conscious look.",
+      entityId: null,
+      priority: 36,
+    });
+  }
+
+  // Goal drift: an active goal behind pace with the deadline near.
+  for (const { e, f } of money) {
+    if (e.type !== "goal" || (e.status ?? "active") !== "active") continue;
+    const target = parseAmount(f.amount);
+    const current = parseAmount(f.current);
+    const pct = target > 0 ? (current / target) * 100 : 0;
+    const deadline = f.deadline ? new Date(f.deadline).getTime() : 0;
+    const daysLeft = deadline ? (deadline - now) / DAY : Infinity;
+    if (deadline && daysLeft > 0 && daysLeft < 45 && pct < 60) {
+      out.push({
+        key: `goal-drift:${e.id}`,
+        type: "GoalDrift",
+        title: `Behind on: ${e.title}`,
+        body: `${Math.round(pct)}% funded with ~${Math.round(daysLeft)} days left. Bump the contribution or move the date.`,
+        entityId: e.id,
+        priority: 46,
+      });
+    }
   }
 
   // 7. Mistake warning: a NEW entry that echoes a PRIOR lesson. Matches on shared

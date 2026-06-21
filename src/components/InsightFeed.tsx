@@ -23,6 +23,11 @@ const STYLE: Record<string, { icon: string; accent: string; chip: string }> = {
   ProjectStalled: { icon: "🚧", accent: "border-zinc-700 bg-zinc-900/40", chip: "text-zinc-300" },
   CommitmentOpportunity: { icon: "🎯", accent: "border-violet-500/25 bg-violet-500/5", chip: "text-violet-300" },
   RepeatedPattern: { icon: "🔁", accent: "border-fuchsia-500/25 bg-fuchsia-500/5", chip: "text-fuchsia-300" },
+  SubscriptionWaste: { icon: "🔁", accent: "border-amber-500/25 bg-amber-500/5", chip: "text-amber-300" },
+  RegretPattern: { icon: "💸", accent: "border-rose-500/25 bg-rose-500/5", chip: "text-rose-300" },
+  PositiveROIPattern: { icon: "📈", accent: "border-emerald-500/25 bg-emerald-500/5", chip: "text-emerald-300" },
+  SpendingDrift: { icon: "📉", accent: "border-amber-500/25 bg-amber-500/5", chip: "text-amber-300" },
+  GoalDrift: { icon: "🪙", accent: "border-cyan-500/25 bg-cyan-500/5", chip: "text-cyan-300" },
 };
 
 const LABEL: Record<string, string> = {
@@ -33,11 +38,19 @@ const LABEL: Record<string, string> = {
   ProjectStalled: "Stalled",
   CommitmentOpportunity: "Opportunity",
   RepeatedPattern: "Pattern",
+  SubscriptionWaste: "Subscription",
+  RegretPattern: "Regret",
+  PositiveROIPattern: "Pays off",
+  SpendingDrift: "Drift",
+  GoalDrift: "Goal",
 };
+
+const MONEY_PATTERN_TYPES = new Set(["RegretPattern", "PositiveROIPattern", "SpendingDrift"]);
 
 function hrefFor(i: InsightDTO): string | null {
   if (i.type === "DecisionReviewReady" && i.entityId) return `/entry/${i.entityId}/edit`;
   if (i.entityId) return `/entry/${i.entityId}`;
+  if (MONEY_PATTERN_TYPES.has(i.type)) return "/money";
   if (i.type === "RepeatedPattern" || i.type === "EmergingInterest") return "/patterns";
   return null;
 }

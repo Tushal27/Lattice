@@ -33,7 +33,7 @@ export default async function EntryPage(props: PageProps<"/entry/[id]">) {
 
   const values = entryToFormValues(entry, entry.type);
   const reviewFields = cfg.fields.filter((f) => f.review && values[f.key]);
-  const reviewed = entry.type === "decision" && reviewFields.length > 0;
+  const reviewed = Boolean(cfg.reviewable) && reviewFields.length > 0;
   const reviewedAt = parseFields(entry.fields).reviewedAt;
   // Column-backed values (status, confidence, dates) already appear in the meta
   // row, so the body shows only the rich, written-out fields. When a decision
@@ -42,7 +42,7 @@ export default async function EntryPage(props: PageProps<"/entry/[id]">) {
     (f) => !f.column && !f.review && values[f.key] && !(reviewed && f.key === "expected"),
   );
   const needsReview =
-    entry.type === "decision" && reviewFields.length === 0 && !parseFields(entry.fields).reviewOutcome;
+    Boolean(cfg.reviewable) && reviewFields.length === 0 && !parseFields(entry.fields).reviewOutcome;
 
   const existing: ExistingConnection[] = [
     ...entry.connectionsFrom.map((c) => ({

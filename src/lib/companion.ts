@@ -7,7 +7,7 @@ import {
   listEntries,
   suggestConnections,
 } from "@/lib/entries";
-import { TYPES } from "@/lib/types";
+import { TYPES, reviewableTypeKeys } from "@/lib/types";
 import { parseFields } from "@/lib/utils";
 
 type SourcedText = { source: "ai" | "local"; text: string };
@@ -111,7 +111,10 @@ function localReflection(entries: EntryLike[], label: string): string {
  * confidence calibration + what's common to right vs wrong calls + advice.
  */
 export async function judgment(): Promise<SourcedText & { reviewedCount: number }> {
-  const decisions = await listEntries({ type: "decision", limit: 300 });
+  // Spans all reviewable types — decisions, financial decisions, investments —
+  // so judgment calibration covers money calls too.
+  const pools = await Promise.all(reviewableTypeKeys().map((type) => listEntries({ type, limit: 300 })));
+  const decisions = pools.flat();
   const reviewed = decisions
     .map((d) => ({ d, f: parseFields(d.fields) }))
     .filter((x) => x.f.reviewVerdict || x.f.reviewOutcome);

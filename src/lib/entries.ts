@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { configFor, type EntryType } from "@/lib/types";
+import { configFor, isReviewable, reviewableTypeKeys, type EntryType } from "@/lib/types";
 import { parseFields } from "@/lib/utils";
 
 export interface EntryInput {
@@ -86,9 +86,9 @@ export function buildEntryInput(type: string, payload: Record<string, unknown>):
 
 const REVIEW_KEYS = ["reviewOutcome", "reviewVerdict", "reviewLearning", "wouldRepeat"];
 
-/** Stamp when a decision was first reviewed, preserving it across later edits. */
+/** Stamp when a reviewable entry was first reviewed, preserving it across edits. */
 function applyReviewStamp(input: EntryInput, existingReviewedAt?: string) {
-  if (input.type !== "decision") return;
+  if (!isReviewable(input.type)) return;
   const fields = (input.fields ??= {});
   const reviewed = REVIEW_KEYS.some((k) => fields[k]);
   if (!reviewed) return;
@@ -332,19 +332,25 @@ export async function getStats() {
   return { byType, openQuestions, total };
 }
 
-/** Decisions made a while ago that haven't been reviewed yet — prompt reflection. */
-export async function decisionsAwaitingReview(days = 14) {
+/**
+ * Reviewable entries (decisions, financial decisions, investments…) old enough to
+ * grade but not yet reviewed — drives the "ready to judge" nudges everywhere.
+ */
+export async function entriesAwaitingReview(days = 14) {
   const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-  const decisions = await prisma.entry.findMany({
-    where: { type: "decision", createdAt: { lt: cutoff } },
+  const entries = await prisma.entry.findMany({
+    where: { type: { in: reviewableTypeKeys() }, createdAt: { lt: cutoff } },
     orderBy: { createdAt: "asc" },
-    take: 20,
+    take: 30,
   });
-  return decisions.filter((d) => {
+  return entries.filter((d) => {
     const f = parseFields(d.fields);
     return !f.reviewedAt && !f.reviewOutcome;
   });
 }
+
+/** Back-compat alias — review now spans all reviewable types, not just decisions. */
+export const decisionsAwaitingReview = entriesAwaitingReview;
 
 interface EntryColumns {
   title: string;

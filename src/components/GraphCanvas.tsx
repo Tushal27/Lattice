@@ -25,6 +25,10 @@ const COLORS: Record<string, string> = {
   architecture: "#22d3ee",
   bug: "#fb923c",
   snippet: "#a3e635",
+  "financial-decision": "#f59e0b",
+  expense: "#f43f5e",
+  investment: "#10b981",
+  goal: "#06b6d4",
   commitment: "#2dd4bf",
 };
 
