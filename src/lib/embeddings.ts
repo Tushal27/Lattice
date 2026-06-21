@@ -78,6 +78,22 @@ export function parseVector(raw: string | null | undefined): number[] | null {
   }
 }
 
+/**
+ * Cosine threshold above which two entries count as "the same topic". Different
+ * embedding models occupy different similarity ranges, so the sensible default
+ * depends on the model — Google's text-embedding-004 sits lower than OpenAI's.
+ * EMBEDDINGS_SIM_THRESHOLD overrides everything.
+ */
+export function simThreshold(): number {
+  const override = Number(process.env.EMBEDDINGS_SIM_THRESHOLD);
+  if (Number.isFinite(override) && override > 0) return override;
+  const model = (process.env.EMBEDDINGS_MODEL || "").toLowerCase();
+  if (model.includes("004") || model.includes("multilingual") || model.includes("google")) return 0.68;
+  if (model.includes("mistral")) return 0.7;
+  if (model.includes("text-embedding-3")) return 0.78;
+  return 0.72;
+}
+
 export interface EmbeddableEntry {
   id: string;
   title: string;

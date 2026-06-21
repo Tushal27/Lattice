@@ -6,7 +6,7 @@
 
 import { prisma } from "@/lib/db";
 import { decisionsAwaitingReview } from "@/lib/entries";
-import { cosine, ensureEmbeddings } from "@/lib/embeddings";
+import { cosine, ensureEmbeddings, simThreshold } from "@/lib/embeddings";
 import { parseAmount, valueScore } from "@/lib/money";
 import { parseFields } from "@/lib/utils";
 
@@ -297,7 +297,7 @@ async function computeCandidates(): Promise<InsightCandidate[]> {
   // by cosine — catches contradictions that share meaning but not words. Falls
   // back to the lexical signals when embeddings are disabled/unavailable.
   const vec = await ensureEmbeddings([...fresh, ...lessonsAll]);
-  const SEM_THRESHOLD = Number(process.env.EMBEDDINGS_SIM_THRESHOLD) || 0.75;
+  const SEM_THRESHOLD = simThreshold();
   const lexRel = (shared: number, text: number) => Math.min(1, (2 * shared + 3 * text) / 5);
 
   let warned = 0;
