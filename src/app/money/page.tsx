@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { MoneyGoals } from "@/components/money/MoneyGoals";
+import { MoneyReflection } from "@/components/money/MoneyReflection";
+import { QuickSpend } from "@/components/money/QuickSpend";
 import { Card, EmptyState, PageHeader, TypeBadge } from "@/components/ui";
 import { moneyAnalytics, formatMoney, type MoneyPeriod } from "@/lib/money";
 import { cn } from "@/lib/utils";
@@ -44,6 +47,9 @@ export default async function MoneyPage(props: PageProps<"/money">) {
         }
       />
 
+      {/* Fast logging */}
+      <QuickSpend />
+
       {/* Period selector */}
       <div className="flex flex-wrap gap-2">
         {PERIODS.map((p) => (
@@ -78,6 +84,9 @@ export default async function MoneyPage(props: PageProps<"/money">) {
         />
       ) : (
         <>
+          {/* AI financial-judgment reflection */}
+          <MoneyReflection period={a.period} />
+
           {/* Headline numbers */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Stat label="Remembered spend" value={formatMoney(a.spend.total)} sub={`${a.spend.count} logged`} accent="text-rose-300" />
@@ -123,27 +132,8 @@ export default async function MoneyPage(props: PageProps<"/money">) {
             </Card>
           )}
 
-          {/* Goals */}
-          {a.goals.length > 0 && (
-            <Card>
-              <h2 className="section-label mb-4">Goals</h2>
-              <div className="space-y-4">
-                {a.goals.map((g) => (
-                  <Link key={g.id} href={`/entry/${g.id}`} className="block">
-                    <div className="mb-1 flex items-center justify-between text-sm">
-                      <span className="text-zinc-200">{g.title}</span>
-                      <span className="tabnums text-zinc-500">
-                        {formatMoney(g.current)} / {formatMoney(g.target)} · {g.pct}%
-                      </span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-white/5">
-                      <div className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-emerald-500" style={{ width: `${g.pct}%` }} />
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </Card>
-          )}
+          {/* Goals — with one-tap contributions */}
+          {a.goals.length > 0 && <MoneyGoals goals={a.goals} />}
         </>
       )}
     </div>

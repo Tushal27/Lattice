@@ -8,6 +8,7 @@ import {
   suggestConnections,
 } from "@/lib/entries";
 import { TYPES, reviewableTypeKeys } from "@/lib/types";
+import { formatMoney, moneyAnalytics, type MoneyPeriod } from "@/lib/money";
 import { parseFields } from "@/lib/utils";
 
 type SourcedText = { source: "ai" | "local"; text: string };
@@ -85,6 +86,73 @@ export async function reflection(period: "week" | "month"): Promise<SourcedText 
   if (ai) return { source: "ai", count: entries.length, text: ai };
 
   return { source: "local", count: entries.length, text: localReflection(entries, label) };
+}
+
+const MONEY_PERIOD_LABEL: Record<MoneyPeriod, string> = {
+  month: "this month",
+  quarter: "this quarter",
+  year: "this year",
+  all: "all time",
+};
+
+/**
+ * A financial-judgment reflection — not accounting. Surfaces the best money, the
+ * most regretted, ROI patterns, and beliefs proven right/wrong, so spending
+ * habits compound into wisdom.
+ */
+export async function moneyReflection(period: MoneyPeriod): Promise<SourcedText> {
+  const a = await moneyAnalytics(period);
+  const label = MONEY_PERIOD_LABEL[period] ?? "this month";
+
+  if (a.spend.count === 0 && !a.best && !a.worst && a.goals.length === 0) {
+    return {
+      source: "local",
+      text: `No money worth reflecting on ${label} yet. Log a few expenses or a financial decision and I'll start surfacing what actually pays off.`,
+    };
+  }
+
+  const cats = a.byCategory
+    .map((c) => `- ${c.category}: ${formatMoney(c.total)} across ${c.count}${c.avgValue != null ? ` · value ${c.avgValue.toFixed(1)} (-1 regret … +2 great)` : " · unrated"}`)
+    .join("\n");
+  const goals = a.goals.map((g) => `- ${g.title}: ${g.pct}% (${formatMoney(g.current)} / ${formatMoney(g.target)})`).join("\n");
+
+  const prompt = [
+    `My money for ${label}. Reflect on whether it bought a better life — this is about judgment, not accounting.`,
+    "",
+    `Remembered spend: ${formatMoney(a.spend.total)} across ${a.spend.count} logged.`,
+    `Active investments: ${formatMoney(a.investments.total)} across ${a.investments.count}.`,
+    a.best ? `Best-rated money: "${a.best.title}" (${formatMoney(a.best.amount)}).` : "",
+    a.worst ? `Most regretted: "${a.worst.title}" (${formatMoney(a.worst.amount)}).` : "",
+    cats ? `\nBy category:\n${cats}` : "",
+    goals ? `\nGoals:\n${goals}` : "",
+    a.awaitingReview ? `\n${a.awaitingReview} financial decisions/investments are old enough to grade but unreviewed.` : "",
+    "",
+    "In short markdown sections, be my financial-judgment coach:",
+    "1. **Best money** — the spend/decision that most improved my life, and why.",
+    "2. **Most regretted** — and the pattern behind it.",
+    "3. **Where money buys me the most life** — the highest-ROI category/theme to lean into.",
+    "4. **A belief proven right** and **a belief proven wrong** by how things turned out.",
+    "5. **One money lesson** worth remembering.",
+    "6. **One change** for next period.",
+    "Reference my actual entries. Be specific, honest, and brief — no generic budgeting advice.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const ai = await generate(prompt, { system: THINKING_PARTNER_SYSTEM, temperature: 0.7 });
+  if (ai) return { source: "ai", text: ai };
+
+  const lines = [
+    `### Money reflection — ${label}`,
+    "",
+    `You logged **${formatMoney(a.spend.total)}** across ${a.spend.count}.`,
+    a.best ? `- 🟢 Best: **${a.best.title}** (${formatMoney(a.best.amount)})` : "",
+    a.worst ? `- 🔴 Most regretted: **${a.worst.title}** (${formatMoney(a.worst.amount)})` : "",
+    cats ? `\n**By category**\n${cats}` : "",
+    "",
+    "_Add an AI key for a deeper, AI-written money reflection._",
+  ].filter(Boolean);
+  return { source: "local", text: lines.join("\n") };
 }
 
 function localReflection(entries: EntryLike[], label: string): string {

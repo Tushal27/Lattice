@@ -1,4 +1,5 @@
-import { askPartner, classifyThought, connectionInsight, judgment, quizBatch, reflection } from "@/lib/companion";
+import { askPartner, classifyThought, connectionInsight, judgment, moneyReflection, quizBatch, reflection } from "@/lib/companion";
+import type { MoneyPeriod } from "@/lib/money";
 
 export async function POST(request: Request) {
   let body: Record<string, unknown>;
@@ -35,6 +36,11 @@ export async function POST(request: Request) {
     }
     case "judgment":
       return Response.json(await judgment());
+    case "money-reflect": {
+      const allowed = ["month", "quarter", "year", "all"];
+      const period = (allowed.includes(String(body.period)) ? body.period : "month") as MoneyPeriod;
+      return Response.json(await moneyReflection(period));
+    }
     case "quiz": {
       const items = Array.isArray(body.items) ? body.items : [];
       return Response.json(await quizBatch(items as Parameters<typeof quizBatch>[0]));

@@ -3,26 +3,12 @@
 // satisfaction live in the entry `fields` JSON and are parsed here.
 
 import { prisma } from "@/lib/db";
+import { parseAmount } from "@/lib/format";
 import { parseFields } from "@/lib/utils";
 
-const LOCALE = process.env.LATTICE_LOCALE || "en-IN";
-const CURRENCY = process.env.LATTICE_CURRENCY || "INR";
-
-export function formatMoney(n: number): string {
-  try {
-    return new Intl.NumberFormat(LOCALE, { style: "currency", currency: CURRENCY, maximumFractionDigits: 0 }).format(n);
-  } catch {
-    return `${Math.round(n)}`;
-  }
-}
+export { formatMoney, parseAmount } from "@/lib/format";
 
 export const MONEY_TYPES = ["financial-decision", "expense", "investment", "goal"];
-
-export function parseAmount(raw: string | null | undefined): number {
-  if (!raw) return 0;
-  const n = Number(String(raw).replace(/[^0-9.]/g, ""));
-  return Number.isFinite(n) ? n : 0;
-}
 
 // A single "value created" axis across money types: expenses use satisfaction,
 // reviewable types use the review verdict. null = not yet judged.
