@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { InsightFeed } from "@/components/InsightFeed";
 import { ModuleScopeProvider, ModuleSwitcher } from "@/components/ModuleSwitcher";
+import { MoneyWidget } from "@/components/MoneyWidget";
 import { OpenChatButton } from "@/components/OpenChatButton";
 import { RecentEntries } from "@/components/RecentEntries";
 import { StatGrid } from "@/components/StatGrid";
 import { decisionsAwaitingReview, getStats, listEntries } from "@/lib/entries";
 import { groupedCommitments } from "@/lib/commitments";
+import { moneyAnalytics } from "@/lib/money";
 import { refreshInsights, type InsightRow } from "@/lib/insights";
 import { prisma } from "@/lib/db";
 import { relativeTime } from "@/lib/utils";
@@ -36,6 +38,13 @@ export default async function Home() {
     groupedCommitments(),
     refreshInsights(),
   ]);
+
+  const money = await moneyAnalytics("month");
+  const moneyWidget = {
+    spendTotal: money.spend.total,
+    spendCount: money.spend.count,
+    worst: money.worst ? { id: money.worst.id, title: money.worst.title, amount: money.worst.amount } : null,
+  };
 
   // Trim to just what the cards need (drops the embedding vector etc. from the payload).
   const recent = recentAll.map((e) => ({
@@ -112,6 +121,8 @@ export default async function Home() {
 
         {/* Side rail: nudges */}
         <aside className="space-y-6">
+          <MoneyWidget data={moneyWidget} />
+
           {dueNow.length > 0 && (
             <div className="elev rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
               <h3 className="mb-2 flex items-center justify-between text-sm font-semibold text-emerald-200">

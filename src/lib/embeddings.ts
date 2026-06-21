@@ -18,32 +18,41 @@ function config() {
   const base = (process.env.EMBEDDINGS_BASE_URL || process.env.AI_BASE_URL || "").trim().replace(/\/+$/, "");
   const key = (process.env.EMBEDDINGS_API_KEY || process.env.AI_API_KEY || "").trim();
   const model = (process.env.EMBEDDINGS_MODEL || "").trim();
-  return { url: base ? `${base}/embeddings` : "", key, model };
+  // Candidate endpoints: an explicit override, else the standard /embeddings and
+  // the singular /embedding some gateways use.
+  const override = process.env.EMBEDDINGS_URL?.trim();
+  const urls = override ? [override] : base ? [`${base}/embeddings`, `${base}/embedding`] : [];
+  return { urls, key, model };
 }
 
 /** Embed a batch of texts. Returns null on any failure so callers can fall back. */
 export async function embed(texts: string[]): Promise<number[][] | null> {
   if (!embeddingsEnabled() || texts.length === 0) return null;
-  const { url, key, model } = config();
-  if (!url) return null;
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ model, input: texts }),
-      signal: AbortSignal.timeout(30_000),
-    });
-    if (!res.ok) {
-      console.warn("embeddings", res.status, await res.text().catch(() => ""));
+  const { urls, key, model } = config();
+  if (urls.length === 0) return null;
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+        body: JSON.stringify({ model, input: texts }),
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (!res.ok) {
+        // 404/405 → likely the wrong path; try the next candidate.
+        if ((res.status === 404 || res.status === 405) && urls.length > 1) continue;
+        console.warn("embeddings", res.status, await res.text().catch(() => ""));
+        return null;
+      }
+      const data = await res.json();
+      const vectors: number[][] = (data?.data ?? []).map((d: { embedding: number[] }) => d.embedding);
+      if (vectors.length === texts.length) return vectors;
       return null;
+    } catch (err) {
+      console.error("embeddings failed", err);
     }
-    const data = await res.json();
-    const vectors: number[][] = (data?.data ?? []).map((d: { embedding: number[] }) => d.embedding);
-    return vectors.length === texts.length ? vectors : null;
-  } catch (err) {
-    console.error("embeddings failed", err);
-    return null;
   }
+  return null;
 }
 
 export function cosine(a: number[], b: number[]): number {
