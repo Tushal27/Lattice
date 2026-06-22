@@ -120,10 +120,25 @@ model PushSubscription {
 }
 
 // Generic key-value store for app-level state that isn't an entry — e.g. the
-// Gmail OAuth token bundle and its sync cursor. One row per key.
+// Google OAuth token bundle, sync cursors, and capability trust settings.
 model AppState {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+// Append-only audit trail of everything the assistant DOES on the user's behalf
+// — every write, every outward action (calendar event, inbox capture). This is
+// what makes autonomy trustworthy: nothing happens that isn't recorded here.
+model ActionLog {
+  id         String   @id @default(cuid())
+  capability String // create_entry | create_commitment | calendar.create_event | gmail.capture | ...
+  summary    String
+  status     String   @default("done") // done | failed | proposed
+  source     String   @default("agent") // agent | gmail | calendar | cron | autonomous | user
+  entityId   String? // related entry/commitment/event id, if any
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
 }
 

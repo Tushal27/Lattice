@@ -91,6 +91,16 @@ const STATEMENTS = [
     "value" TEXT NOT NULL,
     "updatedAt" DATETIME NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS "ActionLog" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "capability" TEXT NOT NULL,
+    "summary" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'done',
+    "source" TEXT NOT NULL DEFAULT 'agent',
+    "entityId" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS "ActionLog_createdAt_idx" ON "ActionLog"("createdAt")`,
   // For databases created before the embedding column existed. SQLite has no
   // "ADD COLUMN IF NOT EXISTS", so this throws "duplicate column" on an
   // already-migrated DB — which the per-statement guard below swallows.

@@ -7,6 +7,8 @@
 // it can't run away or delete anything.
 
 import { aiEnabled, generateDetailed } from "@/lib/ai";
+import { calendarConnected, createEvent } from "@/lib/calendar";
+import { getTrust, logAction } from "@/lib/capabilities";
 import { jsonrepair } from "jsonrepair";
 import { createCommitment, parseDueDate, parseRecurrence, seedRecurringDue } from "@/lib/commitments";
 import { classifyThought } from "@/lib/companion";
@@ -213,6 +215,14 @@ export async function runAgent(
     }
   }
 
+  // Audit every successful write so the user has a complete record of what the
+  // assistant did on their behalf.
+  for (const s of steps) {
+    if (s.ok && WRITE_TOOLS.has(s.tool)) {
+      await logAction({ capability: s.tool, summary: s.summary, source: "agent", entityId: s.entryId ?? null });
+    }
+  }
+
   return {
     reply: reply || "Done.",
     steps,
@@ -246,6 +256,8 @@ async function execute(
         return await connectTool(a);
       case "create_commitment":
         return await commitmentTool(a, opts);
+      case "create_calendar_event":
+        return await calendarTool(a, opts);
       case "search_entries":
         return await searchTool(a);
       case "get_entry":
@@ -367,6 +379,56 @@ async function commitmentTool(args: Record<string, unknown>, opts: ExecOpts = {}
   };
 }
 
+// Outward action: put an event on Google Calendar. Respects the user's trust
+// dial — off refuses, ask proposes (without acting), auto acts then reports.
+// Every outcome is written to the audit log.
+async function calendarTool(args: Record<string, unknown>, opts: ExecOpts = {}): Promise<ExecutedStep> {
+  const tz = opts.tz ?? 0;
+  const title = String(args.summary ?? args.title ?? "").trim();
+  if (!title) return { tool: "create_calendar_event", ok: false, summary: "An event needs a title" };
+
+  const whenRaw = args.start != null ? String(args.start) : args.when != null ? String(args.when) : args.due != null ? String(args.due) : null;
+  const start = parseDueDate(whenRaw, new Date(), tz);
+  if (!start) return { tool: "create_calendar_event", ok: false, summary: "I need a date/time for the event" };
+
+  const trust = await getTrust("calendar.create_event");
+  if (trust === "off") {
+    return { tool: "create_calendar_event", ok: false, summary: "Calendar events are turned off in Settings." };
+  }
+  if (!(await calendarConnected())) {
+    return { tool: "create_calendar_event", ok: false, summary: "Connect Google in Settings to use your calendar." };
+  }
+
+  const whenLabel = start.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+
+  if (trust === "ask") {
+    // Suggest + confirm: don't act, record the proposal, and tell the user how
+    // to let it act automatically.
+    await logAction({ capability: "calendar.create_event", summary: `Proposed event: ${title} · ${whenLabel}`, source: "agent", status: "proposed" });
+    return {
+      tool: "create_calendar_event",
+      ok: true,
+      summary: `Proposed “${title}” for ${whenLabel} (set Calendar to Auto in Settings to let me add it directly)`,
+    };
+  }
+
+  // auto: act, then report.
+  const durationMin = Number(args.durationMinutes) || 30;
+  const created = await createEvent({
+    summary: title,
+    description: args.note != null ? String(args.note) : undefined,
+    start,
+    end: new Date(start.getTime() + durationMin * 60000),
+    location: args.location != null ? String(args.location) : undefined,
+  });
+  if (!created) {
+    await logAction({ capability: "calendar.create_event", summary: `Failed to add event: ${title}`, source: "agent", status: "failed" });
+    return { tool: "create_calendar_event", ok: false, summary: "Couldn't reach Google Calendar just now." };
+  }
+  await logAction({ capability: "calendar.create_event", summary: `Added to calendar: ${title} · ${whenLabel}`, source: "agent", entityId: created.id });
+  return { tool: "create_calendar_event", ok: true, summary: `Added to your calendar: ${title} · ${whenLabel}` };
+}
+
 async function searchTool(args: Record<string, unknown>): Promise<ExecutedStep> {
   const query = String(args.query ?? "");
   const results = await searchEntries(query);
@@ -482,6 +544,7 @@ const AGENT_SYSTEM = [
   "- update_entry{id, ...same fields} — change an existing entry (e.g. mark a question answered, add a decision review).",
   "- connect_entries{fromId, toId, note?} — link two related entries.",
   '- create_commitment{title, due?, recurring?, priority?, note?} — set a follow-through/reminder. `due` is natural language ("tomorrow at 9", "next monday", "in 3 days", "2026-07-01"); `recurring` is daily|weekly|monthly; priority is low|medium|high.',
+  '- create_calendar_event{summary, start, durationMinutes?, location?, note?} — put a real event/time-block on the user\'s Google Calendar. `start` is natural language (same as `due`). Use this when the user wants something on their CALENDAR or a scheduled time-block (a meeting, an appointment, "block 2pm tomorrow to…"), as opposed to a plain reminder (use create_commitment for those). The system enforces the user\'s permission for this — just emit it when appropriate.',
   "- search_entries{query} — find entries (use before update/connect to get real ids).",
   "- get_entry{id} — read one entry's full details.",
   "- list_projects{} / list_recent{limit?} — browse.",

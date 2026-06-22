@@ -40,8 +40,10 @@ export async function POST(request: Request) {
       if (!text) return Response.json({ error: "text required" }, { status: 400 });
       return Response.json(await classifyThought(text));
     }
-    case "brief":
-      return Response.json(await dailyBrief());
+    case "brief": {
+      const kind = body.kind === "morning" || body.kind === "evening" ? body.kind : "auto";
+      return Response.json(await dailyBrief(kind));
+    }
     case "judgment":
       return Response.json(await judgment());
     case "money-reflect": {

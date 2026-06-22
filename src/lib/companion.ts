@@ -12,6 +12,7 @@ import {
 import { TYPES, reviewableTypeKeys } from "@/lib/types";
 import { groupedCommitments } from "@/lib/commitments";
 import { activeInsights } from "@/lib/insights";
+import { calendarConnected, upcomingEvents } from "@/lib/calendar";
 import { formatMoney, moneyAnalytics, type MoneyPeriod } from "@/lib/money";
 import { parseFields } from "@/lib/utils";
 
@@ -239,38 +240,72 @@ export async function judgment(): Promise<SourcedText & { reviewedCount: number 
   };
 }
 
+export type BriefKind = "auto" | "morning" | "evening";
+
+function resolveKind(kind: BriefKind): "morning" | "evening" {
+  if (kind !== "auto") return kind;
+  return new Date().getHours() < 16 ? "morning" : "evening";
+}
+
+async function calendarLines(): Promise<{ today: string[]; count: number }> {
+  try {
+    if (!(await calendarConnected())) return { today: [], count: 0 };
+    const events = await upcomingEvents({ days: 2, max: 12 });
+    const todayStr = new Date().toDateString();
+    const today = events
+      .filter((e) => e.start && new Date(e.start).toDateString() === todayStr)
+      .map((e) => {
+        const t = e.allDay
+          ? "all day"
+          : new Date(e.start).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+        return `- ${t} · ${e.summary}${e.location ? ` @ ${e.location}` : ""}`;
+      });
+    return { today, count: today.length };
+  } catch {
+    return { today: [], count: 0 };
+  }
+}
+
 /**
- * The "good morning" brief — my Jarvis reads the state of my whole world right
- * now (commitments due, decisions to judge, live insights, money) and writes a
- * short, prioritized, human briefing. Deterministic local fallback always works.
+ * The brief — my Jarvis reads the state of my whole world (calendar, commitments,
+ * decisions to judge, live insights, money) and writes a short, prioritized,
+ * human briefing. Morning looks ahead; evening looks back + sets up tomorrow.
+ * Deterministic local fallback always works.
  */
-export async function dailyBrief(): Promise<SourcedText> {
-  const [commitments, toReview, insights, money] = await Promise.all([
+export async function dailyBrief(kind: BriefKind = "auto"): Promise<SourcedText> {
+  const when = resolveKind(kind);
+  const [commitments, toReview, insights, money, cal] = await Promise.all([
     groupedCommitments(),
     decisionsAwaitingReview(14),
     activeInsights(6),
     moneyAnalytics("month"),
+    calendarLines(),
   ]);
 
   const dueNow = [...commitments.overdue, ...commitments.today];
-  const hour = new Date().getHours();
-  const partOfDay = hour < 5 ? "late night" : hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening";
 
   const nothing =
-    dueNow.length === 0 && toReview.length === 0 && insights.length === 0 && commitments.upcoming.length === 0;
+    dueNow.length === 0 && toReview.length === 0 && insights.length === 0 && commitments.upcoming.length === 0 && cal.count === 0;
   if (nothing) {
     return {
       source: "local",
-      text: `Your world is quiet this ${partOfDay} — nothing due, nothing waiting to be judged. Good time to capture a decision or sit with an open question.`,
+      text:
+        when === "evening"
+          ? "Quiet evening — nothing overdue, nothing waiting. A good moment to capture a lesson from today."
+          : "Your day is wide open — nothing due, nothing waiting to be judged. Good time to set an intention or capture a decision.",
     };
   }
 
   const facts = [
+    cal.count ? `On my calendar today:\n${cal.today.join("\n")}` : "",
     dueNow.length
       ? `Commitments due now (${dueNow.length}):\n${dueNow.map((c) => `- ${c.title}${commitments.overdue.some((o) => o.id === c.id) ? " (OVERDUE)" : " (today)"}`).join("\n")}`
       : "",
     commitments.upcoming.length
       ? `Coming up soon:\n${commitments.upcoming.slice(0, 3).map((c) => `- ${c.title}`).join("\n")}`
+      : "",
+    when === "evening" && commitments.done.length
+      ? `Closed out today:\n${commitments.done.slice(0, 5).map((c) => `- ${c.title}`).join("\n")}`
       : "",
     toReview.length
       ? `Decisions old enough to judge (${toReview.length}):\n${toReview.slice(0, 5).map((d) => `- ${d.title}`).join("\n")}`
@@ -285,23 +320,27 @@ export async function dailyBrief(): Promise<SourcedText> {
     .filter(Boolean)
     .join("\n\n");
 
-  const prompt = [
-    `It's ${partOfDay}. You are my Jarvis. Read the state of my world below and write my brief for right now.`,
-    "",
-    facts,
-    "",
-    "Write a tight, prioritized briefing (not a list dump). Open with one warm, specific line about where I stand. Then surface what actually matters most today and why — call out anything overdue or risky first. End with the single most useful thing I could do next. Be concrete, reference my actual items, and keep it under ~150 words. No headers, no filler.",
-  ].join("\n");
+  const intro =
+    when === "evening"
+      ? "It's evening. You are my Jarvis. Read the state of my world below and write my evening brief: a short, honest look back at today and a calm setup for tomorrow."
+      : "It's morning. You are my Jarvis. Read the state of my world below and write my morning brief for the day ahead.";
 
-  const ai = await generate(prompt, { system: WONDER_SYSTEM, temperature: 0.6 });
+  const closing =
+    when === "evening"
+      ? "Acknowledge what got done, gently flag what slipped, name anything worth reflecting on, then point at the one thing that matters most tomorrow. Warm, specific, under ~150 words. No headers, no filler."
+      : "Open with one warm, specific line about where I stand. Surface what matters most today and why — anything overdue, risky, or time-sensitive first, and weave in my calendar. End with the single most useful thing to do next. Concrete, reference my actual items, under ~150 words. No headers, no filler.";
+
+  const ai = await generate([intro, "", facts, "", closing].join("\n"), { system: WONDER_SYSTEM, temperature: 0.6 });
   if (ai) return { source: "ai", text: ai.trim() };
 
   // Deterministic local fallback.
   const parts: string[] = [];
+  if (cal.count) parts.push(`📅 ${cal.count} on your calendar today: ${cal.today.map((l) => l.replace(/^- /, "")).slice(0, 3).join("; ")}.`);
   if (dueNow.length) {
     const overdue = commitments.overdue.length;
     parts.push(`🎯 **${dueNow.length}** ${dueNow.length === 1 ? "commitment" : "commitments"} due${overdue ? ` — ${overdue} overdue` : ""}: ${dueNow.slice(0, 3).map((c) => c.title).join(", ")}.`);
   }
+  if (when === "evening" && commitments.done.length) parts.push(`✅ Closed out ${commitments.done.length} today.`);
   if (toReview.length) parts.push(`⏳ **${toReview.length}** ${toReview.length === 1 ? "decision" : "decisions"} ready to judge.`);
   if (insights.length) parts.push(`💡 ${insights.length} live ${insights.length === 1 ? "insight" : "insights"}: ${insights[0].title}.`);
   if (money.spend.count) parts.push(`💰 ${formatMoney(money.spend.total)} spent this month across ${money.spend.count}.`);

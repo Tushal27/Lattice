@@ -1,3 +1,4 @@
+import { logAction } from "@/lib/capabilities";
 import { extractFromEmails } from "@/lib/companion";
 import { createCommitment, parseDueDate } from "@/lib/commitments";
 import { fetchRecentMessages, gmailConnected, gmailEnabled, markSeen } from "@/lib/gmail";
@@ -38,6 +39,7 @@ export async function POST(request: Request) {
       sourceId: ex.messageId,
     });
     created.push({ id: c.id, title: c.title, due: dueDate ? dueDate.toISOString() : null });
+    await logAction({ capability: "gmail.capture", summary: `From email → commitment: ${c.title}`, source: "gmail", entityId: c.id });
   }
 
   // Remember every message we looked at, action item or not, so we don't re-scan.
