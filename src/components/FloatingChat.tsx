@@ -70,6 +70,7 @@ export function FloatingChat() {
   const [input, setInput] = useState("");
   const [images, setImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [streaming, setStreaming] = useState(false);
   const [attachOpen, setAttachOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const constraintsRef = useRef<HTMLDivElement>(null);
@@ -110,6 +111,42 @@ export function FloatingChat() {
       localStorage.setItem("lattice:chat", JSON.stringify({ messages: messages.slice(-50), memory }));
     } catch {}
   }, [messages, memory]);
+
+  // Memory is server-authoritative now (shared across devices). Load it on
+  // mount; if this device still has only-local memory, migrate it up once.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const d = await (await fetch("/api/memory")).json();
+        if (cancelled) return;
+        const server = typeof d.memory === "string" ? d.memory : "";
+        if (server) {
+          setMemory(server);
+        } else {
+          const local = (() => {
+            try {
+              return JSON.parse(localStorage.getItem("lattice:chat") || "{}").memory || "";
+            } catch {
+              return "";
+            }
+          })();
+          if (local) {
+            fetch("/api/memory", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ memory: local }),
+            }).catch(() => {});
+          }
+        }
+      } catch {
+        /* keep whatever was restored from localStorage */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Let nav entries open the chat directly (optionally in a given mode).
   useEffect(() => {
@@ -166,11 +203,67 @@ export function FloatingChat() {
     setImages([]);
     setLoading(true);
     try {
-      if (here === "wonder") {
+      if (here === "wonder" && imgs.length === 0) {
+        // Streaming path — render tokens the instant they arrive.
+        setMessages((m) => [...m, { role: "ai", mode: "wonder", text: "", source: "ai" }]);
+        let acc = "";
+        try {
+          const res = await fetch("/api/ai/stream", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message, history }),
+          });
+          if (!res.ok || !res.body) throw new Error("no stream");
+          const src: "ai" | "local" = res.headers.get("X-AI") === "off" ? "local" : "ai";
+          const reader = res.body.getReader();
+          const dec = new TextDecoder();
+          let started = false;
+          for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            acc += dec.decode(value, { stream: true });
+            if (!started) {
+              started = true;
+              setStreaming(true);
+            }
+            setMessages((m) => {
+              const c = m.slice();
+              const last = c[c.length - 1];
+              if (last && last.role === "ai") c[c.length - 1] = { ...last, text: acc, source: src };
+              return c;
+            });
+          }
+          if (!acc.trim()) throw new Error("empty");
+        } catch {
+          // Fall back to the blocking endpoint (also serves the no-key message).
+          try {
+            const res = await fetch("/api/ai", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ task: "ask", message, history }),
+            });
+            const data = await res.json();
+            setMessages((m) => {
+              const c = m.slice();
+              c[c.length - 1] = { role: "ai", mode: "wonder", text: data.text, source: data.source, provider: data.provider };
+              return c;
+            });
+          } catch {
+            setMessages((m) => {
+              const c = m.slice();
+              c[c.length - 1] = { role: "ai", mode: "wonder", text: "Couldn't reach the server. Try again.", source: "local" };
+              return c;
+            });
+          }
+        } finally {
+          setStreaming(false);
+        }
+      } else if (here === "wonder") {
+        // Wonder with an image attached → vision (non-streaming).
         const res = await fetch("/api/ai", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ task: "ask", message, history, images: imgs, memory }),
+          body: JSON.stringify({ task: "ask", message, history, images: imgs }),
         });
         const data = await res.json();
         setMessages((m) => [
@@ -456,7 +549,7 @@ export function FloatingChat() {
                   </motion.div>
                 ))}
 
-                {loading && (
+                {loading && !streaming && (
                   <div className="flex justify-start py-1">
                     <span className="flex gap-1.5">
                       <span className="h-2 w-2 animate-bounce rounded-full bg-zinc-500 [animation-delay:-0.3s]" />

@@ -201,11 +201,14 @@ feed. Trust is per-capability and instantly reversible.
 ## 10. Phased roadmap
 
 - **Phase 0 — Foundation (DONE).** Daily Brief, share-target, Gmail capture.
-- **Phase 1 — Awareness & Action (THIS PHASE).** Unified Google OAuth, Calendar
+- **Phase 1 — Awareness & Action (DONE).** Unified Google OAuth, Calendar
   read/write, capability **trust + audit** layer, `create_calendar_event` tool,
   Evening Brief, brief-as-push (morning + evening), Settings hub.
-- **Phase 2 — Conversation.** Streaming chat (time-to-first-token), continuous
-  voice (in/out), server-side durable memory.
+- **Phase 2 — Conversation (IN PROGRESS).** ✅ **Streaming chat** (token-by-token
+  Wonder via `streamText` + `/api/ai/stream`, full fallback chain, graceful
+  degrade). ✅ **Server-side durable memory** (`memory.ts`, `/api/memory`,
+  rolling memory now authoritative and shared across devices, auto-migrated from
+  localStorage). Remaining: continuous voice (in/out).
 - **Phase 3 — Ingestion.** Files/PDF ingestion, GitHub connector, browser/web
   capture; `Source` provenance + `Job` queue.
 - **Phase 4 — Autonomy.** Auto-schedule review blocks, resurface forgotten work,
@@ -220,8 +223,9 @@ feed. Trust is per-capability and instantly reversible.
 1. **Capability trust + audit layer** ✅ — unlocks safe autonomy for everything.
 2. **Calendar read/write** ✅ — the single biggest "knows my world / acts" win.
 3. **Evening brief + brief-as-push** ✅ — turns presence on.
-4. **Streaming chat** (next) — the biggest perceived-intelligence upgrade.
-5. **Server memory** (next) — cross-device continuity, better context.
+4. **Streaming chat** ✅ — token-by-token answers, low time-to-first-token.
+5. **Server memory** ✅ — cross-device continuity, authoritative rolling memory.
+6. **Continuous voice** (next) — voice in/out conversational mode.
 
 ---
 

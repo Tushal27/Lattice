@@ -1,5 +1,5 @@
 import { jsonrepair } from "jsonrepair";
-import { generate, generateDetailed, THINKING_PARTNER_SYSTEM, WONDER_SYSTEM } from "@/lib/ai";
+import { aiEnabled, generate, generateDetailed, streamText, THINKING_PARTNER_SYSTEM, WONDER_SYSTEM } from "@/lib/ai";
 import { appGuide } from "@/lib/appGuide";
 import {
   decisionsAwaitingReview,
@@ -578,20 +578,21 @@ export async function quizBatch(items: QuizItem[]): Promise<Record<string, strin
   }
 }
 
-export async function askPartner(
+// Assemble the grounded Wonder prompt: app guide + carried memory + the entries
+// most semantically relevant to the message + the running conversation. Shared
+// by the blocking and streaming paths so they stay identical.
+async function buildAskPrompt(
   message: string,
-  history: { role: string; text: string }[] = [],
-  images: string[] = [],
-  memory = "",
-): Promise<SourcedText & { provider?: string }> {
-  // Pull the entries most RELEVANT to the message (semantic), not just recent —
-  // focused, high-signal context the model can actually reason over.
+  history: { role: string; text: string }[],
+  memory: string,
+  hasImages: boolean,
+): Promise<string> {
   const context = message.trim() ? await relevantEntries(message, 12) : await listEntries({ limit: 12 });
   const convo = history
     .slice(-10)
     .map((t) => `${t.role === "you" ? "Me" : "You"}: ${t.text}`)
     .join("\n");
-  const prompt = [
+  return [
     appGuide(),
     "",
     ...(memory ? ["What I remember from our earlier chats (carried memory):", memory, ""] : []),
@@ -599,7 +600,7 @@ export async function askPartner(
     context.length ? digest(context) : "(nothing captured yet)",
     "",
     ...(convo ? ["Our conversation so far:", convo, ""] : []),
-    images.length ? "(I've attached an image — read it and factor it into your reply.)" : "",
+    hasImages ? "(I've attached an image — read it and factor it into your reply.)" : "",
     "My message:",
     message || "(see attached image)",
     "",
@@ -607,14 +608,43 @@ export async function askPartner(
   ]
     .filter(Boolean)
     .join("\n");
+}
 
+const ASK_NO_AI =
+  "The AI thinking partner needs an AI key to respond — set GROQ_API_KEY (recommended), OPENROUTER_API_KEY, or GEMINI_API_KEY. Once it's set, I'll draw on your decisions, lessons, and questions to think alongside you.";
+
+export async function askPartner(
+  message: string,
+  history: { role: string; text: string }[] = [],
+  images: string[] = [],
+  memory = "",
+): Promise<SourcedText & { provider?: string }> {
+  const prompt = await buildAskPrompt(message, history, memory, images.length > 0);
   const ai = await generateDetailed(prompt, { system: WONDER_SYSTEM, temperature: 0.7, images });
   if (ai) return { source: "ai", text: ai.text, provider: ai.provider };
+  return { source: "local", text: ASK_NO_AI };
+}
 
-  return {
-    source: "local",
-    text: "The AI thinking partner needs an AI key to respond — set GROQ_API_KEY (recommended), OPENROUTER_API_KEY, or GEMINI_API_KEY. Once it's set, I'll draw on your decisions, lessons, and questions to think alongside you.",
-  };
+/**
+ * Streaming Wonder: yields the same grounded answer token-by-token for instant
+ * time-to-first-token. Falls back to a single message if no provider responds.
+ */
+export async function* askPartnerStream(
+  message: string,
+  history: { role: string; text: string }[] = [],
+  memory = "",
+): AsyncGenerator<string, void, unknown> {
+  if (!aiEnabled()) {
+    yield ASK_NO_AI;
+    return;
+  }
+  const prompt = await buildAskPrompt(message, history, memory, false);
+  let any = false;
+  for await (const chunk of streamText(prompt, { system: WONDER_SYSTEM, temperature: 0.7 })) {
+    any = true;
+    yield chunk;
+  }
+  if (!any) yield "I couldn't reach the AI engine just now — please try again.";
 }
 
 /**

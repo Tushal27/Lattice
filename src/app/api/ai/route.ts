@@ -1,4 +1,5 @@
 import { askPartner, classifyThought, connectionInsight, dailyBrief, judgment, moneyReflection, quizBatch, reflection, summarizeChat } from "@/lib/companion";
+import { getRollingMemory, setRollingMemory } from "@/lib/memory";
 import type { MoneyPeriod } from "@/lib/money";
 
 export async function POST(request: Request) {
@@ -27,13 +28,17 @@ export async function POST(request: Request) {
       const history = Array.isArray(body.history)
         ? (body.history as { role: string; text: string }[]).slice(-10)
         : [];
-      const memory = typeof body.memory === "string" ? body.memory : "";
+      // Memory is server-authoritative so it's shared across devices.
+      const memory = await getRollingMemory();
       return Response.json(await askPartner(message, history, images, memory));
     }
     case "summarize": {
       const msgs = Array.isArray(body.messages) ? (body.messages as { role: string; text: string }[]) : [];
-      const memory = typeof body.memory === "string" ? body.memory : "";
-      return Response.json({ text: await summarizeChat(msgs, memory) });
+      // Fold the conversation into the shared rolling memory and persist it.
+      const prior = await getRollingMemory();
+      const text = await summarizeChat(msgs, prior);
+      await setRollingMemory(text);
+      return Response.json({ text });
     }
     case "classify": {
       const text = String(body.text ?? "").trim();

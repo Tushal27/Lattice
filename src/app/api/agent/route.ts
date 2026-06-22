@@ -1,7 +1,8 @@
 import { runAgent, type AgentTurn } from "@/lib/agent";
+import { getRollingMemory } from "@/lib/memory";
 
 export async function POST(request: Request) {
-  let body: { message?: string; history?: AgentTurn[]; preserveRaw?: boolean; images?: string[]; tz?: number; memory?: string };
+  let body: { message?: string; history?: AgentTurn[]; preserveRaw?: boolean; images?: string[]; tz?: number };
   try {
     body = await request.json();
   } catch {
@@ -20,7 +21,7 @@ export async function POST(request: Request) {
     preserveRaw: body.preserveRaw !== false && Boolean(message),
     images,
     tz: Number.isFinite(body.tz) ? Number(body.tz) : 0,
-    memory: typeof body.memory === "string" ? body.memory : "",
+    memory: await getRollingMemory(), // shared across devices
   });
   return Response.json(result);
 }

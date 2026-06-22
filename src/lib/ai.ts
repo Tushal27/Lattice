@@ -186,6 +186,118 @@ export async function generate(prompt: string, opts: GenerateOptions = {}): Prom
   return (await generateDetailed(prompt, opts))?.text ?? null;
 }
 
+/**
+ * Streaming counterpart to generate(): yields text deltas as the model produces
+ * them, walking the same fallback chain. It commits to the first provider that
+ * emits any token — if a provider fails before producing output, it tries the
+ * next; once tokens have streamed it never restarts (no duplicate text). Yields
+ * nothing if every candidate fails, so callers can fall back.
+ */
+export async function* streamText(prompt: string, opts: GenerateOptions = {}): AsyncGenerator<string, void, unknown> {
+  for (const c of candidates()) {
+    let any = false;
+    try {
+      const gen =
+        c.spec.kind === "gemini"
+          ? streamGemini(c.key, c.model, prompt, opts)
+          : streamOpenAI(c.spec, c.url, c.key, c.model, prompt, opts);
+      for await (const chunk of gen) {
+        if (!chunk) continue;
+        any = true;
+        yield chunk;
+      }
+      if (any) return; // committed to this provider
+    } catch (err) {
+      console.error(`AI stream candidate failed (${c.spec.name})`, err);
+      if (any) return; // already streamed partial output — don't restart elsewhere
+    }
+  }
+}
+
+// Parse OpenAI-style SSE ("data: {…}\n\n", terminated by "data: [DONE]").
+async function* parseSSE(body: ReadableStream<Uint8Array>): AsyncGenerator<Record<string, unknown>> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split("\n");
+    buf = lines.pop() ?? "";
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t.startsWith("data:")) continue;
+      const data = t.slice(5).trim();
+      if (data === "[DONE]") return;
+      try {
+        yield JSON.parse(data);
+      } catch {
+        /* skip partial/non-JSON keepalive lines */
+      }
+    }
+  }
+}
+
+async function* streamOpenAI(
+  spec: ProviderSpec,
+  url: string,
+  key: string,
+  model: string,
+  prompt: string,
+  opts: GenerateOptions,
+): AsyncGenerator<string> {
+  const userContent =
+    opts.images && opts.images.length > 0
+      ? [{ type: "text", text: prompt }, ...opts.images.map((u) => ({ type: "image_url", image_url: { url: u } }))]
+      : prompt;
+  const messages = [
+    ...(opts.system ? [{ role: "system", content: opts.system }] : []),
+    { role: "user", content: userContent },
+  ];
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}`, ...(spec.headers?.() ?? {}) },
+    body: JSON.stringify({ model, messages, temperature: opts.temperature ?? 0.7, stream: true }),
+    signal: AbortSignal.timeout(120_000),
+  });
+  if (!res.ok || !res.body) {
+    if (!res.ok) console.warn(`${spec.name} stream ${res.status}`, await res.text().catch(() => ""));
+    return;
+  }
+  for await (const json of parseSSE(res.body)) {
+    const choices = json.choices as Array<{ delta?: { content?: string } }> | undefined;
+    const delta = choices?.[0]?.delta?.content;
+    if (delta) yield delta;
+  }
+}
+
+async function* streamGemini(key: string, model: string, prompt: string, opts: GenerateOptions): AsyncGenerator<string> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${key}`;
+  const parts: Array<Record<string, unknown>> = [{ text: prompt }];
+  for (const u of opts.images ?? []) {
+    const comma = u.indexOf(",");
+    const mime = u.slice(5, u.indexOf(";")) || "image/jpeg";
+    parts.push({ inline_data: { mime_type: mime, data: u.slice(comma + 1) } });
+  }
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ...(opts.system ? { systemInstruction: { parts: [{ text: opts.system }] } } : {}),
+      contents: [{ role: "user", parts }],
+      generationConfig: { temperature: opts.temperature ?? 0.7 },
+    }),
+    signal: AbortSignal.timeout(120_000),
+  });
+  if (!res.ok || !res.body) return;
+  for await (const json of parseSSE(res.body)) {
+    const cands = json.candidates as Array<{ content?: { parts?: { text?: string }[] } }> | undefined;
+    const text = cands?.[0]?.content?.parts?.map((p) => p.text ?? "").join("");
+    if (text) yield text;
+  }
+}
+
 async function callOpenAI(
   spec: ProviderSpec,
   url: string,
