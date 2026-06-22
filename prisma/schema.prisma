@@ -119,3 +119,11 @@ model PushSubscription {
   createdAt DateTime @default(now())
 }
 
+// Generic key-value store for app-level state that isn't an entry — e.g. the
+// Gmail OAuth token bundle and its sync cursor. One row per key.
+model AppState {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+

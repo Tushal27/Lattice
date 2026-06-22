@@ -19,6 +19,7 @@ const discover = [
   { href: "/timeline", label: "Life Timeline", icon: "🧭" },
   { href: "/patterns", label: "Patterns", icon: "📊" },
   { href: "/reflect", label: "Reflections", icon: "🔮" },
+  { href: "/settings", label: "Settings", icon: "⚙️" },
 ];
 
 function NavLink({ href, label, icon, badge }: { href: string; label: string; icon: string; badge?: number }) {

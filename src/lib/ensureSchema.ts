@@ -86,6 +86,11 @@ const STATEMENTS = [
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "PushSubscription_endpoint_key" ON "PushSubscription"("endpoint")`,
+  `CREATE TABLE IF NOT EXISTS "AppState" (
+    "key" TEXT NOT NULL PRIMARY KEY,
+    "value" TEXT NOT NULL,
+    "updatedAt" DATETIME NOT NULL
+  )`,
   // For databases created before the embedding column existed. SQLite has no
   // "ADD COLUMN IF NOT EXISTS", so this throws "duplicate column" on an
   // already-migrated DB — which the per-statement guard below swallows.

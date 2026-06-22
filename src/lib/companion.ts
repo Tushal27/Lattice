@@ -308,6 +308,75 @@ export async function dailyBrief(): Promise<SourcedText> {
   return { source: "local", text: parts.join("\n\n") || "Nothing pressing right now." };
 }
 
+export interface EmailExtraction {
+  messageId: string;
+  // commitment = a concrete thing I need to do/follow up; skip = nothing actionable.
+  kind: "commitment" | "skip";
+  title: string;
+  summary: string;
+  due: string; // natural-language due hint ("Friday", "tomorrow 5pm") or ""
+}
+
+/**
+ * Reads recent emails and pulls out the few that contain a genuine action item
+ * or commitment for me — so my inbox quietly feeds my follow-throughs instead of
+ * rotting. Returns one row per message (kind "skip" when nothing actionable).
+ */
+export async function extractFromEmails(
+  messages: { id: string; from: string; subject: string; snippet: string; body: string }[],
+): Promise<EmailExtraction[]> {
+  if (messages.length === 0) return [];
+
+  const blocks = messages
+    .map(
+      (m, i) =>
+        `--- EMAIL ${i} (id: ${m.id}) ---\nFrom: ${m.from}\nSubject: ${m.subject}\nBody: ${(m.body || m.snippet).slice(0, 1500)}`,
+    )
+    .join("\n\n");
+
+  const prompt = [
+    "Below are recent emails from my inbox. For EACH email, decide if it contains a concrete action item or commitment I personally need to follow through on (a deadline, a reply owed, a task, a bill, an appointment).",
+    "Ignore newsletters, marketing, notifications, and FYI-only mail — mark those as skip.",
+    "",
+    blocks,
+    "",
+    'Respond with ONLY a JSON array, one object per email, of the form:',
+    '{"id":"<email id>","kind":"commitment|skip","title":"short imperative task","summary":"one line of context","due":"natural-language deadline if any, else empty"}',
+    "Keep titles short and imperative (e.g. \"Reply to Anna about the lease\"). Be conservative — only flag real commitments.",
+  ].join("\n");
+
+  const ai = await generate(prompt, { system: THINKING_PARTNER_SYSTEM, temperature: 0.2 });
+  if (!ai) return messages.map((m) => ({ messageId: m.id, kind: "skip" as const, title: "", summary: "", due: "" }));
+
+  const cleaned = ai.replace(/```json/gi, "").replace(/```/g, "").trim();
+  const start = cleaned.indexOf("[");
+  const end = cleaned.lastIndexOf("]");
+  if (start === -1 || end === -1) return [];
+  let arr: unknown;
+  try {
+    arr = JSON.parse(jsonrepair(cleaned.slice(start, end + 1)));
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(arr)) return [];
+
+  return arr
+    .map((row): EmailExtraction | null => {
+      if (!row || typeof row !== "object") return null;
+      const r = row as Record<string, unknown>;
+      const id = String(r.id ?? "");
+      if (!id) return null;
+      return {
+        messageId: id,
+        kind: r.kind === "commitment" ? "commitment" : "skip",
+        title: String(r.title ?? "").slice(0, 140),
+        summary: String(r.summary ?? "").slice(0, 280),
+        due: String(r.due ?? "").slice(0, 80),
+      };
+    })
+    .filter((x): x is EmailExtraction => x !== null);
+}
+
 export async function connectionInsight(entryId: string) {
   const entry = await getEntry(entryId);
   if (!entry) return { source: "local" as const, text: "Entry not found.", suggestions: [] };
