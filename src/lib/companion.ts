@@ -403,6 +403,7 @@ export async function askPartner(
   message: string,
   history: { role: string; text: string }[] = [],
   images: string[] = [],
+  memory = "",
 ): Promise<SourcedText & { provider?: string }> {
   // Pull the entries most RELEVANT to the message (semantic), not just recent —
   // focused, high-signal context the model can actually reason over.
@@ -414,6 +415,7 @@ export async function askPartner(
   const prompt = [
     appGuide(),
     "",
+    ...(memory ? ["What I remember from our earlier chats (carried memory):", memory, ""] : []),
     "Context from my Lattice — the entries (decisions, lessons, aha moments, questions, projects) most relevant to my message:",
     context.length ? digest(context) : "(nothing captured yet)",
     "",
@@ -434,4 +436,40 @@ export async function askPartner(
     source: "local",
     text: "The AI thinking partner needs an AI key to respond — set GROQ_API_KEY (recommended), OPENROUTER_API_KEY, or GEMINI_API_KEY. Once it's set, I'll draw on your decisions, lessons, and questions to think alongside you.",
   };
+}
+
+/**
+ * Fold a conversation into a short rolling "memory" that carries into the next
+ * thread — so the chat isn't a hoard of transcripts, just a working memory.
+ */
+export async function summarizeChat(
+  messages: { role: string; text: string }[],
+  priorMemory = "",
+): Promise<string> {
+  const convo = messages
+    .filter((m) => m.text?.trim())
+    .map((m) => `${m.role === "you" ? "Me" : "You"}: ${m.text}`)
+    .join("\n");
+  if (!convo.trim()) return priorMemory.slice(0, 1500);
+
+  const prompt = [
+    priorMemory ? `Memory so far:\n${priorMemory}\n` : "",
+    "Conversation to fold into memory:",
+    convo,
+    "",
+    "Update my running memory of these chats into a SHORT note (3–6 sentences, no preamble): what I was exploring, any conclusions or decisions, open threads, and useful facts about me. MERGE with the memory so far and keep it tight — drop stale detail. Write as notes to future-you.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const ai = await generate(prompt, { system: WONDER_SYSTEM, temperature: 0.4 });
+  if (ai) return ai.trim().slice(0, 1500);
+
+  // Local fallback: keep prior memory + the last few things I said.
+  const lastSaid = messages
+    .filter((m) => m.role === "you" && m.text?.trim())
+    .slice(-3)
+    .map((m) => m.text)
+    .join(" • ");
+  return `${priorMemory ? priorMemory + " " : ""}${lastSaid}`.slice(0, 1500);
 }

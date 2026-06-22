@@ -70,7 +70,7 @@ const WRITE_TOOLS = new Set(["create_entry", "update_entry", "connect_entries", 
 export async function runAgent(
   message: string,
   history: AgentTurn[] = [],
-  opts: { preserveRaw?: boolean; images?: string[]; tz?: number } = {},
+  opts: { preserveRaw?: boolean; images?: string[]; tz?: number; memory?: string } = {},
 ): Promise<AgentResult> {
   if (!aiEnabled()) {
     return {
@@ -91,7 +91,7 @@ export async function runAgent(
   let forcedCapture = false;
 
   for (let i = 0; i < MAX_STEPS; i++) {
-    const prompt = buildPrompt(context, history, message, steps, readResults);
+    const prompt = buildPrompt(context, history, message, steps, readResults, opts.memory ?? "");
     // Send any attached images only on the first step (the model reads them to
     // decide what to capture); later reasoning steps don't need to resend them.
     const res = await generateDetailed(prompt, {
@@ -443,9 +443,11 @@ function buildPrompt(
   message: string,
   steps: ExecutedStep[],
   readResults: string[],
+  memory = "",
 ): string {
   const parts: string[] = [];
   parts.push(`Today is ${ctx.today}.`);
+  if (memory) parts.push(`\nMemory from earlier chats (background, may be relevant):\n${memory}`);
   parts.push(`\nRecent entries (id · type · title):\n${ctx.recentText || "(none yet)"}`);
   if (ctx.projectText) parts.push(`\nProjects:\n${ctx.projectText}`);
   if (history.length) {

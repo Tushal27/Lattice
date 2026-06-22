@@ -66,6 +66,7 @@ export function FloatingChat() {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("capture");
   const [messages, setMessages] = useState<Msg[]>([]);
+  const [memory, setMemory] = useState("");
   const [input, setInput] = useState("");
   const [images, setImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -92,8 +93,23 @@ export function FloatingChat() {
       const savedMode = localStorage.getItem("lattice:mode");
       // eslint-disable-next-line react-hooks/set-state-in-effect
       if (savedMode === "wonder" || savedMode === "capture") setMode(savedMode);
+      // Restore the working thread + rolling memory so it survives app close.
+      const savedChat = localStorage.getItem("lattice:chat");
+      if (savedChat) {
+        const c = JSON.parse(savedChat);
+        if (Array.isArray(c.messages)) setMessages(c.messages.slice(-50));
+        if (typeof c.memory === "string") setMemory(c.memory);
+      }
     } catch {}
   }, [fabX, fabY]);
+
+  // Persist the thread + memory (capped — this isn't a chat app, just a robust
+  // working thread).
+  useEffect(() => {
+    try {
+      localStorage.setItem("lattice:chat", JSON.stringify({ messages: messages.slice(-50), memory }));
+    } catch {}
+  }, [messages, memory]);
 
   // Let nav entries open the chat directly (optionally in a given mode).
   useEffect(() => {
@@ -154,7 +170,7 @@ export function FloatingChat() {
         const res = await fetch("/api/ai", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ task: "ask", message, history, images: imgs }),
+          body: JSON.stringify({ task: "ask", message, history, images: imgs, memory }),
         });
         const data = await res.json();
         setMessages((m) => [
@@ -165,7 +181,7 @@ export function FloatingChat() {
         const res = await fetch("/api/agent", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message, history, preserveRaw: true, images: imgs, tz: new Date().getTimezoneOffset() }),
+          body: JSON.stringify({ message, history, preserveRaw: true, images: imgs, tz: new Date().getTimezoneOffset(), memory }),
         });
         const data = await res.json();
         setMessages((m) => [
@@ -215,6 +231,36 @@ export function FloatingChat() {
       );
       if (data.mutated) router.refresh();
     } finally {
+      setLoading(false);
+    }
+  }
+
+  // New thread: fold the current conversation into the rolling memory (so the
+  // next thread remembers the gist), then clear the transcript.
+  async function newChat() {
+    if (loading) return;
+    const hasContent = messages.some((m) => m.role === "ai");
+    if (!hasContent) {
+      setMessages([]);
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          task: "summarize",
+          messages: messages.map((m) => ({ role: m.role, text: m.text })),
+          memory,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (data?.text) setMemory(data.text);
+    } catch {
+      /* keep existing memory */
+    } finally {
+      setMessages([]);
       setLoading(false);
     }
   }
@@ -292,10 +338,10 @@ export function FloatingChat() {
                 <div className="flex items-center gap-1">
                   {messages.length > 0 && (
                     <button
-                      onClick={() => setMessages([])}
+                      onClick={newChat}
                       className="press grid h-9 w-9 place-items-center rounded-full text-zinc-400 hover:bg-white/10 hover:text-zinc-100"
                       aria-label="New chat"
-                      title="New chat"
+                      title="New chat (keeps a memory of this one)"
                     >
                       <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M12 20h9" />
@@ -342,6 +388,11 @@ export function FloatingChat() {
                         ? "Let's think together — I won't save anything unless you tap Save."
                         : "Tell me what happened in plain words — I'll file it with all the detail kept."}
                     </p>
+                    {memory && (
+                      <p className="mx-auto mt-3 max-w-sm text-xs text-violet-300/70">
+                        🧵 Fresh thread — I still remember the gist of our past chats.
+                      </p>
+                    )}
                     <div className="mx-auto mt-4 flex max-w-sm flex-col gap-2">
                       {SUGGESTIONS[mode].map((s) => (
                         <button

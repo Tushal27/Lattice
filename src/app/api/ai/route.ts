@@ -1,4 +1,4 @@
-import { askPartner, classifyThought, connectionInsight, judgment, moneyReflection, quizBatch, reflection } from "@/lib/companion";
+import { askPartner, classifyThought, connectionInsight, judgment, moneyReflection, quizBatch, reflection, summarizeChat } from "@/lib/companion";
 import type { MoneyPeriod } from "@/lib/money";
 
 export async function POST(request: Request) {
@@ -27,7 +27,13 @@ export async function POST(request: Request) {
       const history = Array.isArray(body.history)
         ? (body.history as { role: string; text: string }[]).slice(-10)
         : [];
-      return Response.json(await askPartner(message, history, images));
+      const memory = typeof body.memory === "string" ? body.memory : "";
+      return Response.json(await askPartner(message, history, images, memory));
+    }
+    case "summarize": {
+      const msgs = Array.isArray(body.messages) ? (body.messages as { role: string; text: string }[]) : [];
+      const memory = typeof body.memory === "string" ? body.memory : "";
+      return Response.json({ text: await summarizeChat(msgs, memory) });
     }
     case "classify": {
       const text = String(body.text ?? "").trim();
