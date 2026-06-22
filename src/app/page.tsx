@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { DailyBrief } from "@/components/DailyBrief";
 import { InsightFeed } from "@/components/InsightFeed";
 import { InsightRefresher } from "@/components/InsightRefresher";
 import { ModuleScopeProvider, ModuleSwitcher } from "@/components/ModuleSwitcher";
@@ -66,6 +67,8 @@ export default function Home() {
         </section>
 
         <ModuleSwitcher />
+
+        <DailyBrief />
 
         <Suspense fallback={<div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">{skeletons(5, "h-28 rounded-2xl")}</div>}>
           <DashboardStats />

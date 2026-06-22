@@ -1,4 +1,4 @@
-import { askPartner, classifyThought, connectionInsight, judgment, moneyReflection, quizBatch, reflection, summarizeChat } from "@/lib/companion";
+import { askPartner, classifyThought, connectionInsight, dailyBrief, judgment, moneyReflection, quizBatch, reflection, summarizeChat } from "@/lib/companion";
 import type { MoneyPeriod } from "@/lib/money";
 
 export async function POST(request: Request) {
@@ -40,6 +40,8 @@ export async function POST(request: Request) {
       if (!text) return Response.json({ error: "text required" }, { status: 400 });
       return Response.json(await classifyThought(text));
     }
+    case "brief":
+      return Response.json(await dailyBrief());
     case "judgment":
       return Response.json(await judgment());
     case "money-reflect": {

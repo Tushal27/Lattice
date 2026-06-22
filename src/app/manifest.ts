@@ -22,5 +22,16 @@ export default function manifest(): MetadataRoute.Manifest {
       { name: "Daily Review", short_name: "Review", url: "/review" },
       { name: "Knowledge Graph", short_name: "Graph", url: "/graph" },
     ],
+    // Lets Lattice receive shared text/links from any app's share sheet — the
+    // OS routes the share to /share?title=…&text=…&url=… as a GET.
+    share_target: {
+      action: "/share",
+      method: "GET",
+      params: {
+        title: "title",
+        text: "text",
+        url: "url",
+      },
+    },
   };
 }

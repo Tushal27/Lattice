@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { EntryForm } from "@/components/EntryForm";
 import { MicButton } from "@/components/MicButton";
 import { TYPE_LIST, TYPES, isEntryType, type EntryType } from "@/lib/types";
@@ -14,31 +14,53 @@ interface Classified {
   source: "ai" | "local";
 }
 
-export function QuickCapture({ projects }: { projects: { id: string; title: string }[] }) {
-  const [text, setText] = useState("");
+export function QuickCapture({
+  projects,
+  initialText = "",
+  autoSort = false,
+}: {
+  projects: { id: string; title: string }[];
+  initialText?: string;
+  autoSort?: boolean;
+}) {
+  const [text, setText] = useState(initialText);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<Classified | null>(null);
 
-  async function sort() {
-    if (!text.trim() || loading) return;
-    setLoading(true);
-    const res = await fetch("/api/ai", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ task: "classify", text }),
-    });
-    const data = await res.json();
-    setLoading(false);
-    if (data && isEntryType(data.type)) {
-      setResult({
-        type: data.type,
-        title: data.title ?? "",
-        summary: data.summary ?? "",
-        tags: data.tags ?? [],
-        source: data.source,
+  const sort = useCallback(
+    async (input?: string) => {
+      const t = (input ?? text).trim();
+      if (!t || loading) return;
+      setLoading(true);
+      const res = await fetch("/api/ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task: "classify", text: t }),
       });
+      const data = await res.json();
+      setLoading(false);
+      if (data && isEntryType(data.type)) {
+        setResult({
+          type: data.type,
+          title: data.title ?? "",
+          summary: data.summary ?? "",
+          tags: data.tags ?? [],
+          source: data.source,
+        });
+      }
+    },
+    [text, loading],
+  );
+
+  // When launched from a share / deep link with text already in hand, sort it
+  // immediately so shared content lands as a ready-to-save entry, not a blank box.
+  const autoSorted = useRef(false);
+  useEffect(() => {
+    if (autoSort && initialText.trim() && !autoSorted.current) {
+      autoSorted.current = true;
+      sort(initialText);
     }
-  }
+  }, [autoSort, initialText, sort]);
 
   if (result) {
     const cfg = TYPES[result.type];
@@ -102,7 +124,7 @@ export function QuickCapture({ projects }: { projects: { id: string; title: stri
       <div className="mt-3 flex items-center justify-between">
         <span className="text-xs text-zinc-600">⌘/Ctrl + Enter</span>
         <button
-          onClick={sort}
+          onClick={() => sort()}
           disabled={!text.trim() || loading}
           className="press glow-violet rounded-xl bg-gradient-to-r from-violet-600 to-sky-600 px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50 disabled:shadow-none"
         >
