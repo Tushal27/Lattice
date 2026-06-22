@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { EntryCard } from "@/components/EntryCard";
+import { Skeleton } from "@/components/Skeleton";
 import { EmptyState, PageHeader, TypeBadge } from "@/components/ui";
 import { decisionsAwaitingReview, onThisDay, resurface } from "@/lib/entries";
 import { groupedCommitments } from "@/lib/commitments";
@@ -7,21 +9,9 @@ import { relativeTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-export default async function ReviewPage() {
-  const [toReview, resurfaced, history, commitments] = await Promise.all([
-    decisionsAwaitingReview(),
-    resurface(3),
-    onThisDay(),
-    groupedCommitments(),
-  ]);
-
-  const dueCommitments = [...commitments.overdue, ...commitments.today];
-  const nothing =
-    toReview.length === 0 &&
-    resurfaced.length === 0 &&
-    history.length === 0 &&
-    dueCommitments.length === 0;
-
+// Shell (header + reflect CTA) paints instantly; the data-heavy review content
+// streams in via Suspense so the page is never blank.
+export default function ReviewPage() {
   return (
     <div className="animate-[fadeUp_0.4s_ease-out] space-y-10">
       <PageHeader
@@ -31,22 +21,61 @@ export default async function ReviewPage() {
         subtitle="A few minutes with your past self — judge old calls, and let buried lessons resurface."
       />
 
-      {nothing && (
-        <EmptyState
-          icon="☀️"
-          title="Nothing to resurface yet"
-          hint="As your entries age, this page brings the right ones back at the right time — old decisions to judge, buried lessons to revisit."
-          action={
-            <Link
-              href="/capture"
-              className="press glow-violet rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 px-4 py-2.5 text-sm font-medium text-white"
-            >
-              ＋ Capture something
-            </Link>
-          }
-        />
-      )}
+      <Suspense
+        fallback={
+          <div className="space-y-4">
+            <Skeleton className="h-6 w-48" />
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-16 rounded-xl" />
+            ))}
+          </div>
+        }
+      >
+        <ReviewContent />
+      </Suspense>
 
+      <div className="rounded-2xl border border-violet-500/20 bg-gradient-to-b from-violet-500/10 to-transparent p-5">
+        <p className="text-sm text-zinc-300">Want a deeper look back?</p>
+        <Link href="/reflect" className="mt-1 inline-block text-sm font-medium text-violet-300 hover:underline">
+          Generate a weekly reflection →
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+async function ReviewContent() {
+  const [toReview, resurfaced, history, commitments] = await Promise.all([
+    decisionsAwaitingReview(),
+    resurface(3),
+    onThisDay(),
+    groupedCommitments(),
+  ]);
+
+  const dueCommitments = [...commitments.overdue, ...commitments.today];
+  const nothing =
+    toReview.length === 0 && resurfaced.length === 0 && history.length === 0 && dueCommitments.length === 0;
+
+  if (nothing) {
+    return (
+      <EmptyState
+        icon="☀️"
+        title="Nothing to resurface yet"
+        hint="As your entries age, this page brings the right ones back at the right time — old decisions to judge, buried lessons to revisit."
+        action={
+          <Link
+            href="/capture"
+            className="press glow-violet rounded-xl bg-gradient-to-br from-violet-500 to-violet-700 px-4 py-2.5 text-sm font-medium text-white"
+          >
+            ＋ Capture something
+          </Link>
+        }
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-10">
       {dueCommitments.length > 0 && (
         <section>
           <h2 className="mb-1 text-lg font-semibold text-zinc-100">🎯 Commitments due</h2>
@@ -137,13 +166,6 @@ export default async function ReviewPage() {
           </div>
         </section>
       )}
-
-      <div className="rounded-2xl border border-violet-500/20 bg-gradient-to-b from-violet-500/10 to-transparent p-5">
-        <p className="text-sm text-zinc-300">Want a deeper look back?</p>
-        <Link href="/reflect" className="mt-1 inline-block text-sm font-medium text-violet-300 hover:underline">
-          Generate a weekly reflection →
-        </Link>
-      </div>
     </div>
   );
 }
