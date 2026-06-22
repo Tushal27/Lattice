@@ -1,10 +1,11 @@
 import { jsonrepair } from "jsonrepair";
-import { generate, generateDetailed, THINKING_PARTNER_SYSTEM } from "@/lib/ai";
+import { generate, generateDetailed, THINKING_PARTNER_SYSTEM, WONDER_SYSTEM } from "@/lib/ai";
 import {
   decisionsAwaitingReview,
   entriesInRange,
   getEntry,
   listEntries,
+  relevantEntries,
   suggestConnections,
 } from "@/lib/entries";
 import { TYPES, reviewableTypeKeys } from "@/lib/types";
@@ -402,26 +403,28 @@ export async function askPartner(
   history: { role: string; text: string }[] = [],
   images: string[] = [],
 ): Promise<SourcedText & { provider?: string }> {
-  const recent = await listEntries({ limit: 150 });
+  // Pull the entries most RELEVANT to the message (semantic), not just recent —
+  // focused, high-signal context the model can actually reason over.
+  const context = message.trim() ? await relevantEntries(message, 12) : await listEntries({ limit: 12 });
   const convo = history
     .slice(-10)
     .map((t) => `${t.role === "you" ? "Me" : "You"}: ${t.text}`)
     .join("\n");
   const prompt = [
-    "Recent context from my personal operating system (my entries):",
-    digest(recent),
+    "Context from my Lattice — the entries (decisions, lessons, aha moments, questions, projects) most relevant to my message:",
+    context.length ? digest(context) : "(nothing captured yet)",
     "",
     ...(convo ? ["Our conversation so far:", convo, ""] : []),
     images.length ? "(I've attached an image — read it and factor it into your reply.)" : "",
-    "My new message:",
+    "My message:",
     message || "(see attached image)",
     "",
-    "Reply as a continuation of our conversation — keep the thread, don't restart.",
+    "Give me your best, well-reasoned answer. Use the context above where it's genuinely relevant; otherwise just answer well. Continue our thread, don't restart.",
   ]
     .filter(Boolean)
     .join("\n");
 
-  const ai = await generateDetailed(prompt, { system: THINKING_PARTNER_SYSTEM, temperature: 0.8, images });
+  const ai = await generateDetailed(prompt, { system: WONDER_SYSTEM, temperature: 0.7, images });
   if (ai) return { source: "ai", text: ai.text, provider: ai.provider };
 
   return {

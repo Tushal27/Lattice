@@ -150,3 +150,43 @@ export async function embedQuery(text: string): Promise<number[] | null> {
   const v = await embed([text]);
   return v?.[0] ?? null;
 }
+
+/** How many entries still lack a stored vector. */
+export async function countMissingEmbeddings(): Promise<{ total: number; missing: number }> {
+  const [total, missing] = await Promise.all([
+    prisma.entry.count(),
+    prisma.entry.count({ where: { embedding: null } }),
+  ]);
+  return { total, missing };
+}
+
+/**
+ * Embed entries that have no stored vector yet, in batches, up to `max` per call
+ * (so a single request stays within serverless time limits). Returns how many
+ * were embedded and how many still remain, so the caller can loop to completion.
+ */
+export async function backfillEmbeddings(max = 200): Promise<{ embedded: number; remaining: number }> {
+  if (!embeddingsEnabled()) return { embedded: 0, remaining: 0 };
+  const rows = await prisma.entry.findMany({
+    where: { embedding: null },
+    select: { id: true, title: true, summary: true },
+    take: max,
+  });
+
+  let embedded = 0;
+  const BATCH = 32;
+  for (let i = 0; i < rows.length; i += BATCH) {
+    const batch = rows.slice(i, i + BATCH);
+    const vectors = await embed(batch.map((e) => `${e.title}\n${e.summary ?? ""}`.trim()));
+    if (!vectors) break; // provider error — stop, remaining reflects what's left
+    await Promise.all(
+      batch.map((e, j) =>
+        prisma.entry.update({ where: { id: e.id }, data: { embedding: JSON.stringify(vectors[j]) } }).catch(() => {}),
+      ),
+    );
+    embedded += batch.length;
+  }
+
+  const remaining = await prisma.entry.count({ where: { embedding: null } });
+  return { embedded, remaining };
+}

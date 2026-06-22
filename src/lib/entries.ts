@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { cosine, embeddingsEnabled, parseVector, simThreshold } from "@/lib/embeddings";
+import { cosine, embed, embedQuery, embeddingsEnabled, parseVector, simThreshold } from "@/lib/embeddings";
 import { configFor, isReviewable, reviewableTypeKeys, type EntryType } from "@/lib/types";
 import { parseFields } from "@/lib/utils";
 
@@ -284,10 +284,17 @@ export async function suggestConnections(entryId: string, limit = 5) {
   const tagNames = new Set(entry.tags.map((t) => t.tag.name));
   const words = keywords(`${entry.title} ${entry.summary ?? ""} ${Object.values(parseFields(entry.fields)).join(" ")}`);
 
-  // Prefer semantic similarity (cosine over stored vectors) when available; it's
-  // far more accurate than keyword overlap. Reads stored vectors only — no
-  // network on a page load; the cron backfills embeddings.
-  const qVec = embeddingsEnabled() ? parseVector(entry.embedding) : null;
+  // Prefer semantic similarity (cosine over stored vectors). The viewed entry is
+  // embedded on demand if it has no vector yet (one call, then persisted), so
+  // suggestions are semantic immediately — not only after the cron backfill.
+  let qVec = embeddingsEnabled() ? parseVector(entry.embedding) : null;
+  if (embeddingsEnabled() && !qVec) {
+    const v = await embed([`${entry.title}\n${entry.summary ?? ""}`.trim()]);
+    qVec = v?.[0] ?? null;
+    if (qVec) {
+      prisma.entry.update({ where: { id: entry.id }, data: { embedding: JSON.stringify(qVec) } }).catch(() => {});
+    }
+  }
   const SUGGEST_SIM = Math.max(0.5, simThreshold() - 0.05);
 
   const candidates = await prisma.entry.findMany({
@@ -336,6 +343,33 @@ function keywords(text: string): Set<string> {
       .split(/\s+/)
       .filter((w) => w.length > 3 && !STOP.has(w)),
   );
+}
+
+/**
+ * Entries most RELEVANT to a query (semantic when embeddings are on, recency
+ * otherwise) — used to give Wonder focused, high-signal context instead of a
+ * recency dump.
+ */
+export async function relevantEntries(query: string, limit = 12) {
+  const q = query.trim();
+  if (embeddingsEnabled() && q) {
+    const qv = await embedQuery(q);
+    if (qv) {
+      const rows = await prisma.entry.findMany({
+        where: { embedding: { not: null } },
+        select: { type: true, title: true, summary: true, status: true, fields: true, embedding: true },
+      });
+      const scored = rows
+        .map((r) => ({ r, s: cosine(qv, parseVector(r.embedding) ?? []) }))
+        .filter((x) => x.s > 0.3)
+        .sort((a, b) => b.s - a.s)
+        .slice(0, limit);
+      if (scored.length) {
+        return scored.map(({ r }) => ({ type: r.type, title: r.title, summary: r.summary, status: r.status, fields: r.fields }));
+      }
+    }
+  }
+  return listEntries({ limit });
 }
 
 export async function getStats() {
