@@ -1,4 +1,5 @@
 import { ActivityLog } from "@/components/ActivityLog";
+import { AutonomyNow } from "@/components/AutonomyNow";
 import { BookmarkletCard } from "@/components/BookmarkletCard";
 import { GitHubConnect } from "@/components/GitHubConnect";
 import { GoogleConnect } from "@/components/GoogleConnect";
@@ -37,6 +38,7 @@ export default function SettingsPage() {
           <strong className="text-zinc-300">Auto</strong> acts, then tells you.
         </p>
         <PermissionSettings />
+        <AutonomyNow />
       </section>
 
       <section className="space-y-3">

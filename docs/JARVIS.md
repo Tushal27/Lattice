@@ -218,8 +218,13 @@ feed. Trust is per-capability and instantly reversible.
   engineering note). ✅ **One-click web capture** (bookmarklet → same-origin
   `/ingest?url=`). PDF skipped by request. Remaining: `Job` queue for async
   ingestion; richer web extraction (readability, YouTube/oEmbed).
-- **Phase 4 — Autonomy.** Auto-schedule review blocks, resurface forgotten work,
-  spending-drift interventions — all trust-gated and audited.
+- **Phase 4 — Autonomy (DONE).** ✅ `autonomy.ts` engine on the cron/event path,
+  acting only on AUTO-trust capabilities (the ASK tier stays served by insights +
+  brief, so no duplicate nudges). ✅ **Auto-schedule decision-review blocks** onto
+  the calendar (double-gated by `calendar.create_event`, deduped). ✅ **Resurface
+  forgotten work** + ✅ **spending-drift / goal-risk alerts** via push (one nudge
+  per day each). Everything trust-gated, deduped, and written to the audit log;
+  manual trigger at `/api/autonomy/run` + a "Run now" control in Settings.
 - **Phase 5 — Presence everywhere.** Widgets, cross-device memory sync, smarter
   notification targeting.
 
@@ -233,7 +238,11 @@ feed. Trust is per-capability and instantly reversible.
 4. **Streaming chat** ✅ — token-by-token answers, low time-to-first-token.
 5. **Server memory** ✅ — cross-device continuity, authoritative rolling memory.
 6. **Continuous voice** ✅ — hands-free listen → stream → speak → listen loop.
-7. **Autonomy** (next) — trust-gated, audited proactive actions.
+7. **Autonomy** ✅ — trust-gated, audited, deduped proactive actions on the cron.
+
+All seven roadmap capabilities are now in place. What remains is depth, not new
+pillars: a durable `Job` queue (replace cron fan-out), richer web extraction,
+multi-device memory beyond the rolling summary, and tuning autonomy thresholds.
 
 ---
 

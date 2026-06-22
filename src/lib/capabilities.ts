@@ -43,8 +43,22 @@ export const CAPABILITIES: CapabilitySpec[] = [
   {
     key: "autonomy.schedule_reviews",
     label: "Auto-schedule decision reviews",
-    description: "When a decision is old enough to judge, schedule a review block automatically.",
+    description: "When a decision is old enough to judge, put a review block on your calendar automatically.",
     defaultTrust: "ask",
+    outward: false,
+  },
+  {
+    key: "autonomy.resurface",
+    label: "Resurface forgotten work",
+    description: "Proactively nudge me about buried lessons, stale questions, and stalled projects.",
+    defaultTrust: "auto",
+    outward: false,
+  },
+  {
+    key: "autonomy.spending_alert",
+    label: "Spending-drift alerts",
+    description: "Warn me when spending drifts or a financial goal falls behind.",
+    defaultTrust: "auto",
     outward: false,
   },
 ];

@@ -1,3 +1,4 @@
+import { runAutonomy } from "@/lib/autonomy";
 import { dailyBrief } from "@/lib/companion";
 import { groupedCommitments } from "@/lib/commitments";
 import { refreshInsights } from "@/lib/insights";
@@ -31,6 +32,9 @@ async function run(request: Request) {
   ]);
   const due = commitments.overdue.length + commitments.today.length;
 
+  // Act on the user's behalf (only the AUTO-trust capabilities; deduped + audited).
+  const autonomy = await runAutonomy().catch(() => ({ scheduled: 0, nudged: [], actions: [] as string[] }));
+
   let sent = 0;
   if (pushEnabled()) {
     // The brief itself is the notification body — intelligence-driven, not spam.
@@ -52,7 +56,7 @@ async function run(request: Request) {
     }
   }
 
-  return Response.json({ ok: true, kind, due, insights: insights.length, pushed: sent, pushEnabled: pushEnabled() });
+  return Response.json({ ok: true, kind, due, insights: insights.length, pushed: sent, pushEnabled: pushEnabled(), autonomy });
 }
 
 export async function GET(request: Request) {
