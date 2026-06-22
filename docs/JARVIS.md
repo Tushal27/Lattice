@@ -204,17 +204,19 @@ feed. Trust is per-capability and instantly reversible.
 - **Phase 1 — Awareness & Action (DONE).** Unified Google OAuth, Calendar
   read/write, capability **trust + audit** layer, `create_calendar_event` tool,
   Evening Brief, brief-as-push (morning + evening), Settings hub.
-- **Phase 2 — Conversation (IN PROGRESS).** ✅ **Streaming chat** (token-by-token
+- **Phase 2 — Conversation (DONE).** ✅ **Streaming chat** (token-by-token
   Wonder via `streamText` + `/api/ai/stream`, full fallback chain, graceful
   degrade). ✅ **Server-side durable memory** (`memory.ts`, `/api/memory`,
-  rolling memory now authoritative and shared across devices, auto-migrated from
-  localStorage). Remaining: continuous voice (in/out).
+  rolling memory authoritative + shared across devices, auto-migrated). ✅
+  **Continuous voice** (`voice.ts` + hands-free loop in FloatingChat: listen →
+  stream → speak → listen, with live state, barge-out, graceful no-support).
 - **Phase 3 — Ingestion (IN PROGRESS).** ✅ `Source` provenance table + shared
   `ingestText()` path (distill → entry → provenance → auto-link → audit).
   ✅ **Files** (text/markdown, read client-side — no server parser deps).
   ✅ **Browser/web capture** (`/api/ingest/url` fetches + distills, deduped by
   URL). ✅ **GitHub** (read-only PAT → recent-activity snapshot distilled into an
-  engineering note). PDF skipped by request. Remaining: `Job` queue for async
+  engineering note). ✅ **One-click web capture** (bookmarklet → same-origin
+  `/ingest?url=`). PDF skipped by request. Remaining: `Job` queue for async
   ingestion; richer web extraction (readability, YouTube/oEmbed).
 - **Phase 4 — Autonomy.** Auto-schedule review blocks, resurface forgotten work,
   spending-drift interventions — all trust-gated and audited.
@@ -230,7 +232,8 @@ feed. Trust is per-capability and instantly reversible.
 3. **Evening brief + brief-as-push** ✅ — turns presence on.
 4. **Streaming chat** ✅ — token-by-token answers, low time-to-first-token.
 5. **Server memory** ✅ — cross-device continuity, authoritative rolling memory.
-6. **Continuous voice** (next) — voice in/out conversational mode.
+6. **Continuous voice** ✅ — hands-free listen → stream → speak → listen loop.
+7. **Autonomy** (next) — trust-gated, audited proactive actions.
 
 ---
 

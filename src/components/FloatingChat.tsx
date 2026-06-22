@@ -9,6 +9,14 @@ import { MicButton } from "@/components/MicButton";
 import { TYPES, type EntryType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { compressImage } from "@/lib/image";
+import {
+  getRecognitionCtor,
+  speak,
+  stopSpeaking,
+  voiceInSupported,
+  voiceOutSupported,
+  type RecognitionLike,
+} from "@/lib/voice";
 
 type Mode = "wonder" | "capture";
 
@@ -71,6 +79,15 @@ export function FloatingChat() {
   const [images, setImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [streaming, setStreaming] = useState(false);
+  // Hands-free conversation mode (voice in → answer → voice out → listen again).
+  const [voiceOn, setVoiceOn] = useState(false);
+  const [voiceState, setVoiceState] = useState<"idle" | "listening" | "thinking" | "speaking">("idle");
+  const [voiceSupported, setVoiceSupported] = useState(false);
+  const voiceOnRef = useRef(false);
+  const recRef = useRef<RecognitionLike | null>(null);
+  const finalRef = useRef("");
+  const recErrorRef = useRef(false);
+  const sendRef = useRef<(t: string) => Promise<string>>(async () => "");
   const [attachOpen, setAttachOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const constraintsRef = useRef<HTMLDivElement>(null);
@@ -148,6 +165,17 @@ export function FloatingChat() {
     };
   }, []);
 
+  // Voice support is client-only.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setVoiceSupported(voiceInSupported());
+  }, []);
+
+  // Tearing down: if the chat closes while a conversation is live, end it.
+  useEffect(() => {
+    if (!open && voiceOnRef.current) stopConversation();
+  }, [open]);
+
   // Let nav entries open the chat directly (optionally in a given mode).
   useEffect(() => {
     const onOpen = (e: Event) => {
@@ -191,10 +219,10 @@ export function FloatingChat() {
     setImages((prev) => [...prev, ...(compressed.filter(Boolean) as string[])].slice(0, 4));
   }
 
-  async function send(text: string) {
+  async function send(text: string): Promise<string> {
     const message = text.trim();
     const imgs = images;
-    if ((!message && imgs.length === 0) || loading) return;
+    if ((!message && imgs.length === 0) || loading) return "";
     window.dispatchEvent(new CustomEvent("lattice:stt-stop"));
     const here = mode;
     const history = messages.map((m) => ({ role: m.role, text: m.text }));
@@ -202,6 +230,7 @@ export function FloatingChat() {
     setInput("");
     setImages([]);
     setLoading(true);
+    let replyText = "";
     try {
       if (here === "wonder" && imgs.length === 0) {
         // Streaming path — render tokens the instant they arrive.
@@ -234,6 +263,7 @@ export function FloatingChat() {
             });
           }
           if (!acc.trim()) throw new Error("empty");
+          replyText = acc;
         } catch {
           // Fall back to the blocking endpoint (also serves the no-key message).
           try {
@@ -243,6 +273,7 @@ export function FloatingChat() {
               body: JSON.stringify({ task: "ask", message, history }),
             });
             const data = await res.json();
+            replyText = data.text ?? "";
             setMessages((m) => {
               const c = m.slice();
               c[c.length - 1] = { role: "ai", mode: "wonder", text: data.text, source: data.source, provider: data.provider };
@@ -266,6 +297,7 @@ export function FloatingChat() {
           body: JSON.stringify({ task: "ask", message, history, images: imgs }),
         });
         const data = await res.json();
+        replyText = data.text ?? "";
         setMessages((m) => [
           ...m,
           { role: "ai", mode: "wonder", text: data.text, source: data.source, provider: data.provider },
@@ -277,6 +309,7 @@ export function FloatingChat() {
           body: JSON.stringify({ message, history, preserveRaw: true, images: imgs, tz: new Date().getTimezoneOffset(), memory }),
         });
         const data = await res.json();
+        replyText = data.reply ?? "";
         setMessages((m) => [
           ...m,
           {
@@ -296,6 +329,104 @@ export function FloatingChat() {
     } finally {
       setLoading(false);
     }
+    return replyText;
+  }
+
+  // Keep a stable handle to the latest send() so the voice loop (whose callbacks
+  // are captured at recognition-creation time) always uses fresh conversation
+  // history without re-binding the whole loop each render.
+  sendRef.current = send;
+
+  // ---- hands-free conversation loop ----------------------------------------
+  function beginListen() {
+    const Ctor = getRecognitionCtor();
+    if (!Ctor || !voiceOnRef.current) return;
+    stopSpeaking();
+    const rec = new Ctor();
+    rec.lang = navigator.language || "en-US";
+    rec.interimResults = true;
+    rec.continuous = false;
+    finalRef.current = "";
+    recErrorRef.current = false;
+    setVoiceState("listening");
+    rec.onresult = (e) => {
+      let interim = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const r = e.results[i];
+        if (r.isFinal) finalRef.current += r[0].transcript;
+        else interim += r[0].transcript;
+      }
+      setInput((finalRef.current + interim).replace(/\s+/g, " ").trimStart());
+    };
+    rec.onerror = () => {
+      recErrorRef.current = true;
+    };
+    rec.onend = () => {
+      const text = finalRef.current.trim();
+      setInput("");
+      if (!voiceOnRef.current) {
+        setVoiceState("idle");
+        return;
+      }
+      // A recognition error (e.g. mic permission denied) — stop rather than spin.
+      if (recErrorRef.current && !text) {
+        stopConversation();
+        return;
+      }
+      if (text) {
+        void voiceTurn(text);
+      } else {
+        // Silence timeout — keep the ear open for the next thing they say.
+        setTimeout(() => beginListen(), 300);
+      }
+    };
+    recRef.current = rec;
+    try {
+      rec.start();
+    } catch {
+      setTimeout(() => beginListen(), 400);
+    }
+  }
+
+  async function voiceTurn(text: string) {
+    setVoiceState("thinking");
+    const reply = await sendRef.current(text);
+    if (!voiceOnRef.current) {
+      setVoiceState("idle");
+      return;
+    }
+    if (reply && voiceOutSupported()) {
+      setVoiceState("speaking");
+      speak(reply, () => {
+        if (voiceOnRef.current) beginListen();
+        else setVoiceState("idle");
+      });
+    } else {
+      beginListen();
+    }
+  }
+
+  function startConversation() {
+    if (!voiceSupported) return;
+    changeMode("wonder");
+    voiceOnRef.current = true;
+    setVoiceOn(true);
+    setOpen(true);
+    beginListen();
+  }
+
+  function stopConversation() {
+    voiceOnRef.current = false;
+    setVoiceOn(false);
+    setVoiceState("idle");
+    try {
+      recRef.current?.abort?.();
+      recRef.current?.stop();
+    } catch {
+      /* ignore */
+    }
+    stopSpeaking();
+    setInput("");
   }
 
   // Bridge: turn a Wonder conversation (up to message `index`) into a saved entry.
@@ -410,7 +541,18 @@ export function FloatingChat() {
                   <div>
                     <div className="text-sm font-semibold text-zinc-100">Lattice Agent</div>
                     <div className="flex items-center gap-1.5 text-[11px] text-zinc-400">
-                      {lastAi ? (
+                      {voiceOn ? (
+                        <>
+                          <span className="h-1.5 w-1.5 rounded-full bg-rose-400 animate-pulse" />
+                          {voiceState === "listening"
+                            ? "listening…"
+                            : voiceState === "thinking"
+                              ? "thinking…"
+                              : voiceState === "speaking"
+                                ? "speaking…"
+                                : "voice mode"}
+                        </>
+                      ) : lastAi ? (
                         lastAi.source === "ai" ? (
                           <>
                             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
@@ -429,6 +571,31 @@ export function FloatingChat() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
+                  {voiceSupported && (
+                    <button
+                      onClick={() => (voiceOn ? stopConversation() : startConversation())}
+                      className={cn(
+                        "press relative grid h-9 w-9 place-items-center rounded-full transition-colors",
+                        voiceOn ? "bg-rose-500/90 text-white" : "text-zinc-400 hover:bg-white/10 hover:text-zinc-100",
+                      )}
+                      aria-label={voiceOn ? "End voice conversation" : "Start voice conversation"}
+                      aria-pressed={voiceOn}
+                      title={voiceOn ? "End voice conversation" : "Talk hands-free"}
+                    >
+                      {voiceOn && <span className="absolute inset-0 animate-ping rounded-full bg-rose-500/40" />}
+                      <svg viewBox="0 0 24 24" className="relative h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        {voiceOn ? (
+                          <rect x="6" y="6" width="12" height="12" rx="2" />
+                        ) : (
+                          <>
+                            <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+                            <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
+                            <line x1="12" y1="19" x2="12" y2="22" />
+                          </>
+                        )}
+                      </svg>
+                    </button>
+                  )}
                   {messages.length > 0 && (
                     <button
                       onClick={newChat}

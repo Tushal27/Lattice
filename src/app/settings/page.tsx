@@ -1,4 +1,5 @@
 import { ActivityLog } from "@/components/ActivityLog";
+import { BookmarkletCard } from "@/components/BookmarkletCard";
 import { GitHubConnect } from "@/components/GitHubConnect";
 import { GoogleConnect } from "@/components/GoogleConnect";
 import { IngestPanel } from "@/components/IngestPanel";
@@ -26,6 +27,7 @@ export default function SettingsPage() {
       <section className="space-y-3">
         <h2 className="section-label px-1">Ingest knowledge</h2>
         <IngestPanel />
+        <BookmarkletCard />
       </section>
 
       <section className="space-y-3">
