@@ -18,6 +18,9 @@ const SOURCE_ICON: Record<string, string> = {
   cron: "⏰",
   autonomous: "✨",
   user: "👤",
+  file: "📄",
+  url: "🔗",
+  github: "🐙",
 };
 
 function ago(iso: string): string {

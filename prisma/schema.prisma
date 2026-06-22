@@ -127,6 +127,20 @@ model AppState {
   updatedAt DateTime @updatedAt
 }
 
+// Provenance for ingested knowledge — every entry created from an external
+// source (a file, a web page, a GitHub repo) records where it came from, so the
+// same item is never ingested twice and "show original" stays possible.
+model Source {
+  id         String   @id @default(cuid())
+  provider   String // file | url | github
+  externalId String? // url, repo full name, content hash — used for dedupe
+  title      String
+  entryId    String? // the entry distilled from this source
+  createdAt  DateTime @default(now())
+
+  @@index([provider])
+}
+
 // Append-only audit trail of everything the assistant DOES on the user's behalf
 // — every write, every outward action (calendar event, inbox capture). This is
 // what makes autonomy trustworthy: nothing happens that isn't recorded here.

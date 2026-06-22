@@ -83,7 +83,7 @@ export interface ActionInput {
   capability: string;
   summary: string;
   status?: "done" | "failed" | "proposed";
-  source?: "agent" | "gmail" | "calendar" | "cron" | "autonomous" | "user";
+  source?: "agent" | "gmail" | "calendar" | "cron" | "autonomous" | "user" | "file" | "url" | "github";
   entityId?: string | null;
 }
 

@@ -91,6 +91,15 @@ const STATEMENTS = [
     "value" TEXT NOT NULL,
     "updatedAt" DATETIME NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS "Source" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "provider" TEXT NOT NULL,
+    "externalId" TEXT,
+    "title" TEXT NOT NULL,
+    "entryId" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS "Source_provider_idx" ON "Source"("provider")`,
   `CREATE TABLE IF NOT EXISTS "ActionLog" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "capability" TEXT NOT NULL,

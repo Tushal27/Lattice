@@ -510,6 +510,48 @@ function safeJson(raw: string): Record<string, unknown> | null {
   }
 }
 
+/**
+ * Distills a longer piece of external content (an article, a file, a repo
+ * snapshot) into ONE structured knowledge entry — a clean title, a real
+ * distillation of the key takeaways, the best-fit type, and tags. Falls back to
+ * the local heuristic so ingestion always produces something.
+ */
+export async function extractKnowledge(
+  text: string,
+  ctx: { source: string; title?: string } = { source: "content" },
+): Promise<Classification> {
+  const trimmed = text.trim().slice(0, 6000);
+  if (!trimmed) return { source: "local", ...heuristicClassify(ctx.title ?? "") };
+
+  const prompt = [
+    `I'm saving content from ${ctx.source}${ctx.title ? ` titled "${ctx.title}"` : ""} into Lattice (my second brain). Distill it into ONE knowledge entry.`,
+    "Respond with ONLY a JSON object, no markdown:",
+    '{"type":"lesson|aha|question|decision|project|snippet","title":"short clear title","summary":"2-4 sentence distillation of the real takeaways — not a description of the document","tags":["lowercase","tags"]}',
+    "Pick the single best type (prefer lesson or aha for articles/notes, snippet for code). Title under 12 words. 3-5 tags.",
+    "Capture what's actually USEFUL to remember, in my voice — not 'this article discusses…'.",
+    "",
+    `Content:\n"""${trimmed}"""`,
+  ].join("\n");
+
+  const ai = await generate(prompt, { temperature: 0.3 });
+  if (ai) {
+    const parsed = safeJson(ai);
+    if (parsed) {
+      const type = typeof parsed.type === "string" && parsed.type in TYPES ? parsed.type : "lesson";
+      return {
+        source: "ai",
+        type,
+        title: String(parsed.title ?? ctx.title ?? "").slice(0, 140) || (ctx.title ?? trimmed.slice(0, 80)),
+        summary: String(parsed.summary ?? ""),
+        tags: Array.isArray(parsed.tags) ? parsed.tags.map(String).slice(0, 5) : [],
+      };
+    }
+  }
+
+  const base = heuristicClassify(ctx.title ? `${ctx.title}. ${trimmed}` : trimmed);
+  return { source: "local", ...base, title: ctx.title?.slice(0, 140) || base.title };
+}
+
 function heuristicClassify(text: string): Omit<Classification, "source"> {
   const lower = text.toLowerCase();
   // Stems are matched at a word boundary but without a trailing one, so they

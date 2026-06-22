@@ -1,5 +1,7 @@
 import { ActivityLog } from "@/components/ActivityLog";
+import { GitHubConnect } from "@/components/GitHubConnect";
 import { GoogleConnect } from "@/components/GoogleConnect";
+import { IngestPanel } from "@/components/IngestPanel";
 import { NotificationToggle } from "@/components/NotificationToggle";
 import { PermissionSettings } from "@/components/PermissionSettings";
 import { PageHeader } from "@/components/ui";
@@ -18,6 +20,12 @@ export default function SettingsPage() {
       <section className="space-y-3">
         <h2 className="section-label px-1">Integrations</h2>
         <GoogleConnect />
+        <GitHubConnect />
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="section-label px-1">Ingest knowledge</h2>
+        <IngestPanel />
       </section>
 
       <section className="space-y-3">

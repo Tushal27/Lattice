@@ -209,8 +209,13 @@ feed. Trust is per-capability and instantly reversible.
   degrade). ✅ **Server-side durable memory** (`memory.ts`, `/api/memory`,
   rolling memory now authoritative and shared across devices, auto-migrated from
   localStorage). Remaining: continuous voice (in/out).
-- **Phase 3 — Ingestion.** Files/PDF ingestion, GitHub connector, browser/web
-  capture; `Source` provenance + `Job` queue.
+- **Phase 3 — Ingestion (IN PROGRESS).** ✅ `Source` provenance table + shared
+  `ingestText()` path (distill → entry → provenance → auto-link → audit).
+  ✅ **Files** (text/markdown, read client-side — no server parser deps).
+  ✅ **Browser/web capture** (`/api/ingest/url` fetches + distills, deduped by
+  URL). ✅ **GitHub** (read-only PAT → recent-activity snapshot distilled into an
+  engineering note). PDF skipped by request. Remaining: `Job` queue for async
+  ingestion; richer web extraction (readability, YouTube/oEmbed).
 - **Phase 4 — Autonomy.** Auto-schedule review blocks, resurface forgotten work,
   spending-drift interventions — all trust-gated and audited.
 - **Phase 5 — Presence everywhere.** Widgets, cross-device memory sync, smarter
