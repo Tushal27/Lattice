@@ -13,6 +13,7 @@ import { TYPES, reviewableTypeKeys } from "@/lib/types";
 import { groupedCommitments } from "@/lib/commitments";
 import { activeInsights } from "@/lib/insights";
 import { calendarConnected, upcomingEvents } from "@/lib/calendar";
+import { factsBlock } from "@/lib/memory";
 import { formatMoney, moneyAnalytics, type MoneyPeriod } from "@/lib/money";
 import { parseFields } from "@/lib/utils";
 
@@ -629,7 +630,10 @@ async function buildAskPrompt(
   memory: string,
   hasImages: boolean,
 ): Promise<string> {
-  const context = message.trim() ? await relevantEntries(message, 12) : await listEntries({ limit: 12 });
+  const [context, facts] = await Promise.all([
+    message.trim() ? relevantEntries(message, 12) : listEntries({ limit: 12 }),
+    factsBlock(16),
+  ]);
   const convo = history
     .slice(-10)
     .map((t) => `${t.role === "you" ? "Me" : "You"}: ${t.text}`)
@@ -637,6 +641,7 @@ async function buildAskPrompt(
   return [
     appGuide(),
     "",
+    ...(facts ? ["Durable facts about me (long-term memory):", facts, ""] : []),
     ...(memory ? ["What I remember from our earlier chats (carried memory):", memory, ""] : []),
     "Context from my Lattice — the entries (decisions, lessons, aha moments, questions, projects) most relevant to my message:",
     context.length ? digest(context) : "(nothing captured yet)",
@@ -687,6 +692,41 @@ export async function* askPartnerStream(
     yield chunk;
   }
   if (!any) yield "I couldn't reach the AI engine just now — please try again.";
+}
+
+/**
+ * Pull durable, reusable facts about the user out of a conversation — stable
+ * preferences, ongoing projects, recurring constraints — for the structured
+ * memory store. Returns a short list of terse, self-contained statements.
+ */
+export async function extractFacts(messages: { role: string; text: string }[]): Promise<string[]> {
+  const convo = messages
+    .filter((m) => m.text?.trim())
+    .map((m) => `${m.role === "you" ? "Me" : "You"}: ${m.text}`)
+    .join("\n");
+  if (!convo.trim()) return [];
+
+  const prompt = [
+    "From this conversation, extract any DURABLE facts about me worth remembering long-term —",
+    "stable preferences, ongoing projects/goals, recurring constraints, tools I use, people/roles.",
+    "Ignore one-off or transient details. Each fact must stand on its own without the conversation.",
+    'Respond with ONLY a JSON array of short strings (max 8), e.g. ["Prefers concise answers","Building Lattice, a personal OS"]. Empty array if nothing durable.',
+    "",
+    convo,
+  ].join("\n");
+
+  const ai = await generate(prompt, { temperature: 0.2 });
+  if (!ai) return [];
+  const cleaned = ai.replace(/```json/gi, "").replace(/```/g, "").trim();
+  const start = cleaned.indexOf("[");
+  const end = cleaned.lastIndexOf("]");
+  if (start === -1 || end === -1) return [];
+  try {
+    const arr = JSON.parse(jsonrepair(cleaned.slice(start, end + 1)));
+    return Array.isArray(arr) ? arr.map(String).filter((s) => s.trim().length > 3).slice(0, 8) : [];
+  } catch {
+    return [];
+  }
 }
 
 /**

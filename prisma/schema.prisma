@@ -127,6 +127,35 @@ model AppState {
   updatedAt DateTime @updatedAt
 }
 
+// A durable background-work queue. Producers enqueue (slow ingestion, scheduled
+// autonomy); the cron / a drain endpoint runs them — decoupling heavy work from
+// the request path, with retries.
+model Job {
+  id        String   @id @default(cuid())
+  kind      String // ingest.url | autonomy.run | ...
+  payload   String? // JSON args
+  status    String   @default("pending") // pending | done | failed
+  attempts  Int      @default(0)
+  runAt     DateTime @default(now())
+  lastError String?
+  createdAt DateTime @default(now())
+
+  @@index([status, runAt])
+}
+
+// Durable structured memory beyond the rolling summary — discrete facts about
+// the user (preferences, ongoing work, stable truths) that get injected into the
+// assistant's context. Server-side, so it follows the user across devices.
+model Memory {
+  id        String   @id @default(cuid())
+  kind      String   @default("fact") // fact | preference
+  content   String
+  weight    Int      @default(1)
+  createdAt DateTime @default(now())
+
+  @@index([kind])
+}
+
 // Provenance for ingested knowledge — every entry created from an external
 // source (a file, a web page, a GitHub repo) records where it came from, so the
 // same item is never ingested twice and "show original" stays possible.

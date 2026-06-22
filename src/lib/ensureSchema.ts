@@ -91,6 +91,25 @@ const STATEMENTS = [
     "value" TEXT NOT NULL,
     "updatedAt" DATETIME NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS "Job" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "kind" TEXT NOT NULL,
+    "payload" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'pending',
+    "attempts" INTEGER NOT NULL DEFAULT 0,
+    "runAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "lastError" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS "Job_status_runAt_idx" ON "Job"("status", "runAt")`,
+  `CREATE TABLE IF NOT EXISTS "Memory" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "kind" TEXT NOT NULL DEFAULT 'fact',
+    "content" TEXT NOT NULL,
+    "weight" INTEGER NOT NULL DEFAULT 1,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS "Memory_kind_idx" ON "Memory"("kind")`,
   `CREATE TABLE IF NOT EXISTS "Source" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "provider" TEXT NOT NULL,

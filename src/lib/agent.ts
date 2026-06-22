@@ -24,6 +24,7 @@ import {
   searchEntries,
   updateEntry,
 } from "@/lib/entries";
+import { factsBlock } from "@/lib/memory";
 import { MODULES, TYPE_LIST, TYPES, isEntryType } from "@/lib/types";
 import { parseFields } from "@/lib/utils";
 
@@ -477,11 +478,15 @@ async function recentTool(args: Record<string, unknown>): Promise<ExecutedStep> 
 // ---- prompt construction ---------------------------------------------------
 
 async function buildContext() {
-  const [recent, projects] = await Promise.all([listEntries({ limit: 60 }), listProjects()]);
+  const [recent, projects, facts] = await Promise.all([
+    listEntries({ limit: 60 }),
+    listProjects(),
+    factsBlock(12),
+  ]);
   const recentText = recent.map((e) => `${e.id} · ${e.type} · ${e.title}`).join("\n");
   const projectText = projects.map((p) => `${p.id} · ${p.title}`).join("\n");
   const today = new Date().toISOString().slice(0, 10);
-  return { recentText, projectText, today };
+  return { recentText, projectText, today, facts };
 }
 
 function typeSchema(): string {
@@ -500,7 +505,7 @@ function typeSchema(): string {
 }
 
 function buildPrompt(
-  ctx: { recentText: string; projectText: string; today: string },
+  ctx: { recentText: string; projectText: string; today: string; facts?: string },
   history: AgentTurn[],
   message: string,
   steps: ExecutedStep[],
@@ -509,6 +514,7 @@ function buildPrompt(
 ): string {
   const parts: string[] = [];
   parts.push(`Today is ${ctx.today}.`);
+  if (ctx.facts) parts.push(`\nDurable facts about the user (long-term memory):\n${ctx.facts}`);
   if (memory) parts.push(`\nMemory from earlier chats (background, may be relevant):\n${memory}`);
   parts.push(`\nRecent entries (id · type · title):\n${ctx.recentText || "(none yet)"}`);
   if (ctx.projectText) parts.push(`\nProjects:\n${ctx.projectText}`);

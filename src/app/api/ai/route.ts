@@ -1,5 +1,5 @@
-import { askPartner, classifyThought, connectionInsight, dailyBrief, judgment, moneyReflection, quizBatch, reflection, summarizeChat } from "@/lib/companion";
-import { getRollingMemory, setRollingMemory } from "@/lib/memory";
+import { askPartner, classifyThought, connectionInsight, dailyBrief, extractFacts, judgment, moneyReflection, quizBatch, reflection, summarizeChat } from "@/lib/companion";
+import { addFacts, getRollingMemory, setRollingMemory } from "@/lib/memory";
 import type { MoneyPeriod } from "@/lib/money";
 
 export async function POST(request: Request) {
@@ -34,11 +34,12 @@ export async function POST(request: Request) {
     }
     case "summarize": {
       const msgs = Array.isArray(body.messages) ? (body.messages as { role: string; text: string }[]) : [];
-      // Fold the conversation into the shared rolling memory and persist it.
+      // Fold the conversation into the shared rolling memory, and harvest durable
+      // facts into the structured memory store — both in parallel.
       const prior = await getRollingMemory();
-      const text = await summarizeChat(msgs, prior);
-      await setRollingMemory(text);
-      return Response.json({ text });
+      const [text, facts] = await Promise.all([summarizeChat(msgs, prior), extractFacts(msgs)]);
+      await Promise.all([setRollingMemory(text), facts.length ? addFacts(facts) : Promise.resolve(0)]);
+      return Response.json({ text, facts: facts.length });
     }
     case "classify": {
       const text = String(body.text ?? "").trim();

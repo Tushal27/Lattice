@@ -75,8 +75,120 @@ export async function ingestText(input: IngestInput): Promise<IngestResult> {
   return { ok: true, entryId: entry.id, title: entryInput.title, type };
 }
 
-/** Fetch a URL and reduce it to readable title + text (no heavy deps). */
+// Decode the HTML entities that actually show up in readable text.
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;|&rsquo;/g, "'")
+    .replace(/&ldquo;|&rdquo;/g, '"')
+    .replace(/&mdash;/g, "—")
+    .replace(/&hellip;/g, "…")
+    .replace(/&#(\d+);/g, (_, n) => {
+      try {
+        return String.fromCodePoint(Number(n));
+      } catch {
+        return " ";
+      }
+    });
+}
+
+function stripTags(html: string): string {
+  return decodeEntities(
+    html
+      .replace(/<(script|style|noscript|svg|nav|header|footer|form|aside)[\s\S]*?<\/\1>/gi, " ")
+      .replace(/<[^>]+>/g, " "),
+  )
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Prefer the main article body when the page marks one up — much cleaner than
+// stripping the whole document (nav, menus, footers).
+function extractArticle(html: string): { title: string; text: string } {
+  const title = decodeEntities(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const block =
+    html.match(/<article[\s\S]*?<\/article>/i)?.[0] ??
+    html.match(/<main[\s\S]*?<\/main>/i)?.[0] ??
+    html;
+  const text = stripTags(block.length > 400 ? block : html).slice(0, 10000);
+  return { title, text };
+}
+
+async function youtubeMeta(url: string): Promise<{ title: string; text: string } | null> {
+  try {
+    const res = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`, {
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!res.ok) return null;
+    const d = (await res.json()) as { title?: string; author_name?: string };
+    if (!d.title) return null;
+    return { title: d.title, text: `YouTube video: ${d.title}${d.author_name ? `\nBy: ${d.author_name}` : ""}\nSource: ${url}` };
+  } catch {
+    return null;
+  }
+}
+
+async function githubRepoMeta(u: URL): Promise<{ title: string; text: string } | null> {
+  const m = u.pathname.match(/^\/([^/]+)\/([^/]+)\/?$/);
+  if (!m) return null;
+  const full = `${m[1]}/${m[2].replace(/\.git$/, "")}`;
+  try {
+    const repoRes = await fetch(`https://api.github.com/repos/${full}`, {
+      headers: { Accept: "application/vnd.github+json", "User-Agent": "Lattice" },
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!repoRes.ok) return null;
+    const repo = (await repoRes.json()) as { full_name: string; description?: string; language?: string; stargazers_count?: number };
+    let readme = "";
+    try {
+      const rdRes = await fetch(`https://api.github.com/repos/${full}/readme`, {
+        headers: { Accept: "application/vnd.github.raw", "User-Agent": "Lattice" },
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (rdRes.ok) readme = (await rdRes.text()).slice(0, 8000);
+    } catch {
+      /* readme optional */
+    }
+    const text = [
+      `GitHub repo: ${repo.full_name}`,
+      repo.description ? `Description: ${repo.description}` : "",
+      repo.language ? `Language: ${repo.language}` : "",
+      repo.stargazers_count != null ? `Stars: ${repo.stargazers_count}` : "",
+      readme ? `\nREADME:\n${readme}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+    return { title: repo.full_name, text };
+  } catch {
+    return null;
+  }
+}
+
+/** Fetch a URL and reduce it to readable title + text. Special-cases YouTube
+ *  (oEmbed) and GitHub repos (API + README); otherwise article-aware HTML. */
 export async function fetchReadable(url: string): Promise<{ title: string; text: string } | null> {
+  let host = "";
+  try {
+    const u = new URL(url);
+    host = u.hostname.replace(/^www\./, "");
+    if (host === "youtube.com" || host === "youtu.be" || host === "m.youtube.com") {
+      const yt = await youtubeMeta(url);
+      if (yt) return yt;
+    }
+    if (host === "github.com") {
+      const gh = await githubRepoMeta(u);
+      if (gh) return gh;
+    }
+  } catch {
+    return null;
+  }
+
   let res: Response;
   try {
     res = await fetch(url, {
@@ -90,25 +202,10 @@ export async function fetchReadable(url: string): Promise<{ title: string; text:
   const ctype = res.headers.get("content-type") ?? "";
   const raw = await res.text();
 
-  // Plain text / markdown: use as-is.
   if (ctype.includes("text/plain") || ctype.includes("markdown")) {
     return { title: url, text: raw.slice(0, 12000) };
   }
 
-  const title = (raw.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? url)
-    .replace(/\s+/g, " ")
-    .trim();
-  const text = raw
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&#\d+;/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 10000);
-
-  return { title, text };
+  const { title, text } = extractArticle(raw);
+  return { title: title || url, text };
 }

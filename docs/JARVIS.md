@@ -240,9 +240,23 @@ feed. Trust is per-capability and instantly reversible.
 6. **Continuous voice** ✅ — hands-free listen → stream → speak → listen loop.
 7. **Autonomy** ✅ — trust-gated, audited, deduped proactive actions on the cron.
 
-All seven roadmap capabilities are now in place. What remains is depth, not new
-pillars: a durable `Job` queue (replace cron fan-out), richer web extraction,
-multi-device memory beyond the rolling summary, and tuning autonomy thresholds.
+All seven roadmap capabilities are in place. The depth layer is now built too:
+
+- ✅ **Durable `Job` queue** (`jobs.ts`, `Job` table) — enqueue + drain with
+  retries/backoff; background URL ingestion (`/api/ingest/url {async:true}`) and
+  scheduled autonomy run through it; cron drains it, plus `/api/jobs/drain`.
+- ✅ **Richer web extraction** — YouTube (oEmbed), GitHub repos (API + README),
+  and article-aware HTML (`<article>`/`<main>` + entity decoding) in `fetchReadable`.
+- ✅ **Structured memory beyond the rolling summary** — `Memory` table + facts
+  (`addFacts`/`listFacts`/`factsBlock`), harvested on summarize via `extractFacts`,
+  injected into both Wonder and the agent, editable in Settings, cross-device.
+- ✅ **Tunable autonomy** — `AutonomyConfig` (review age, schedule hour, quiet
+  hours, tz) at `/api/autonomy/config`; reviews scheduled at the user's local
+  time, nudges suppressed during quiet hours.
+
+Further depth (optional): minute-level queue draining (needs a Pro cron or
+external trigger), embeddings over facts, and learning autonomy thresholds from
+outcomes.
 
 ---
 

@@ -34,11 +34,53 @@ async function onceToday(key: string): Promise<boolean> {
   return true;
 }
 
-function tomorrowAt(hour: number): Date {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  d.setHours(hour, 0, 0, 0);
-  return d;
+// ---- tunable config --------------------------------------------------------
+
+export interface AutonomyConfig {
+  reviewAgeDays: number; // how old a decision must be before auto-scheduling a review
+  scheduleHour: number; // local hour to place review blocks at
+  quietStart: number; // local hour quiet period starts (no push nudges)
+  quietEnd: number; // local hour quiet period ends
+  tz: number; // minutes east of UTC (e.g. IST = +330)
+}
+
+const DEFAULT_CONFIG: AutonomyConfig = { reviewAgeDays: 14, scheduleHour: 9, quietStart: 22, quietEnd: 7, tz: 0 };
+const CONFIG_KEY = "autonomy:config";
+
+export async function getAutonomyConfig(): Promise<AutonomyConfig> {
+  const row = await prisma.appState.findUnique({ where: { key: CONFIG_KEY } });
+  if (!row) return DEFAULT_CONFIG;
+  try {
+    return { ...DEFAULT_CONFIG, ...(JSON.parse(row.value) as Partial<AutonomyConfig>) };
+  } catch {
+    return DEFAULT_CONFIG;
+  }
+}
+
+export async function setAutonomyConfig(patch: Partial<AutonomyConfig>): Promise<AutonomyConfig> {
+  const next = { ...(await getAutonomyConfig()), ...patch };
+  await prisma.appState.upsert({
+    where: { key: CONFIG_KEY },
+    create: { key: CONFIG_KEY, value: JSON.stringify(next) },
+    update: { value: JSON.stringify(next) },
+  });
+  return next;
+}
+
+// The instant corresponding to tomorrow at `hour`:00 in the user's local time.
+function tomorrowAtLocal(hour: number, tzMin: number): Date {
+  const local = new Date(Date.now() + tzMin * 60000); // shift so UTC fields read as wall clock
+  local.setUTCDate(local.getUTCDate() + 1);
+  local.setUTCHours(hour, 0, 0, 0);
+  return new Date(local.getTime() - tzMin * 60000);
+}
+
+// Don't send push nudges during the user's quiet hours (handles overnight wrap).
+function inQuietHours(cfg: AutonomyConfig): boolean {
+  const localHour = new Date(Date.now() + cfg.tz * 60000).getUTCHours();
+  const { quietStart: s, quietEnd: e } = cfg;
+  if (s === e) return false;
+  return s < e ? localHour >= s && localHour < e : localHour >= s || localHour < e;
 }
 
 export interface AutonomyResult {
@@ -51,16 +93,18 @@ export async function runAutonomy(): Promise<AutonomyResult> {
   const actions: string[] = [];
   const nudged: string[] = [];
   let scheduled = 0;
+  const cfg = await getAutonomyConfig();
+  const quiet = inQuietHours(cfg);
 
   // 1. Auto-schedule decision reviews onto the calendar. Double-gated: the
   //    autonomy dial AND the calendar-write capability must both allow it.
   if ((await getTrust("autonomy.schedule_reviews")) === "auto") {
     if ((await calendarConnected()) && (await getTrust("calendar.create_event")) !== "off") {
-      const due = await decisionsAwaitingReview(14);
+      const due = await decisionsAwaitingReview(cfg.reviewAgeDays);
       const seen = await readSet("autonomy:scheduled-reviews");
       const fresh = due.filter((d) => !seen.has(d.id)).slice(0, 5);
       for (const d of fresh) {
-        const start = tomorrowAt(9);
+        const start = tomorrowAtLocal(cfg.scheduleHour, cfg.tz);
         const ev = await createEvent({
           summary: `Review decision: ${d.title}`,
           description: "Lattice: enough time has passed — judge how this decision actually turned out.",
@@ -85,8 +129,8 @@ export async function runAutonomy(): Promise<AutonomyResult> {
     }
   }
 
-  // 2. Resurface forgotten work — a single gentle nudge per day.
-  if ((await getTrust("autonomy.resurface")) === "auto" && (await onceToday("autonomy:resurface:lastrun"))) {
+  // 2. Resurface forgotten work — a single gentle nudge per day, outside quiet hours.
+  if (!quiet && (await getTrust("autonomy.resurface")) === "auto" && (await onceToday("autonomy:resurface:lastrun"))) {
     const items = await resurface(3);
     if (items.length && pushEnabled()) {
       const r = await sendPushToAll({
@@ -103,8 +147,8 @@ export async function runAutonomy(): Promise<AutonomyResult> {
     }
   }
 
-  // 3. Spending-drift / goal-risk intervention — one nudge per day.
-  if ((await getTrust("autonomy.spending_alert")) === "auto" && (await onceToday("autonomy:spending:lastrun"))) {
+  // 3. Spending-drift / goal-risk intervention — one nudge per day, outside quiet hours.
+  if (!quiet && (await getTrust("autonomy.spending_alert")) === "auto" && (await onceToday("autonomy:spending:lastrun"))) {
     const [risks, insights] = await Promise.all([moneyGoalRisks(), activeInsights(20)]);
     const drift = insights.find((i) => i.type === "SpendingDrift" || i.type === "RegretPattern");
     let body = "";

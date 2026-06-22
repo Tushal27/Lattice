@@ -2,6 +2,7 @@ import { runAutonomy } from "@/lib/autonomy";
 import { dailyBrief } from "@/lib/companion";
 import { groupedCommitments } from "@/lib/commitments";
 import { refreshInsights } from "@/lib/insights";
+import { drainJobs } from "@/lib/jobs";
 import { pushEnabled, sendPushToAll } from "@/lib/push";
 
 // Periodic proactive check — wired to Vercel Cron (see vercel.json), morning and
@@ -32,7 +33,9 @@ async function run(request: Request) {
   ]);
   const due = commitments.overdue.length + commitments.today.length;
 
-  // Act on the user's behalf (only the AUTO-trust capabilities; deduped + audited).
+  // Drain any queued background work, then act on the user's behalf (AUTO-trust
+  // capabilities only; deduped + audited).
+  await drainJobs().catch(() => ({ ran: 0, done: 0, failed: 0 }));
   const autonomy = await runAutonomy().catch(() => ({ scheduled: 0, nudged: [], actions: [] as string[] }));
 
   let sent = 0;

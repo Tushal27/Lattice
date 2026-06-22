@@ -1,9 +1,11 @@
 import { ActivityLog } from "@/components/ActivityLog";
+import { AutonomyConfig } from "@/components/AutonomyConfig";
 import { AutonomyNow } from "@/components/AutonomyNow";
 import { BookmarkletCard } from "@/components/BookmarkletCard";
 import { GitHubConnect } from "@/components/GitHubConnect";
 import { GoogleConnect } from "@/components/GoogleConnect";
 import { IngestPanel } from "@/components/IngestPanel";
+import { MemoryCard } from "@/components/MemoryCard";
 import { NotificationToggle } from "@/components/NotificationToggle";
 import { PermissionSettings } from "@/components/PermissionSettings";
 import { PageHeader } from "@/components/ui";
@@ -38,7 +40,13 @@ export default function SettingsPage() {
           <strong className="text-zinc-300">Auto</strong> acts, then tells you.
         </p>
         <PermissionSettings />
+        <AutonomyConfig />
         <AutonomyNow />
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="section-label px-1">Memory</h2>
+        <MemoryCard />
       </section>
 
       <section className="space-y-3">
