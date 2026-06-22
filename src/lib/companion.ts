@@ -1,5 +1,6 @@
 import { jsonrepair } from "jsonrepair";
 import { generate, generateDetailed, THINKING_PARTNER_SYSTEM, WONDER_SYSTEM } from "@/lib/ai";
+import { appGuide } from "@/lib/appGuide";
 import {
   decisionsAwaitingReview,
   entriesInRange,
@@ -411,6 +412,8 @@ export async function askPartner(
     .map((t) => `${t.role === "you" ? "Me" : "You"}: ${t.text}`)
     .join("\n");
   const prompt = [
+    appGuide(),
+    "",
     "Context from my Lattice — the entries (decisions, lessons, aha moments, questions, projects) most relevant to my message:",
     context.length ? digest(context) : "(nothing captured yet)",
     "",

@@ -275,6 +275,9 @@ export const WONDER_SYSTEM = [
   "connection that pushes their thinking further — optional, not every time.",
   "The user often types with typos or dictates by voice; read for intent. Be warm, direct, and honest —",
   "disagree when they're wrong.",
+  "You also know how Lattice itself works (a guide is provided in context). When the user is confused about",
+  "the app or a feature, or asks how/where to do something, explain it clearly and accurately from that",
+  "guide and name the exact screen and action — you are their in-app help too.",
 ].join(" ");
 
 export const THINKING_PARTNER_SYSTEM = [
