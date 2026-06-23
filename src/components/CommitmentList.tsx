@@ -378,53 +378,106 @@ function Section({
       <div className="space-y-2">
         <AnimatePresence initial={false}>
           {items.map((c) => (
-            <motion.div
+            <Row
               key={c.id}
-              layout
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, height: 0, marginTop: 0 }}
-              className={cn("flex items-center gap-3 rounded-xl border p-3.5", TONE[tone])}
-            >
-              <button
-                onClick={() => onComplete(c)}
-                disabled={busy === c.id}
-                aria-label="Mark done"
-                className="press grid h-6 w-6 shrink-0 place-items-center rounded-full border border-white/20 text-transparent transition-colors hover:border-emerald-400 hover:text-emerald-400"
-              >
-                ✓
-              </button>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  {c.priority && PRIORITY_DOT[c.priority] && (
-                    <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", PRIORITY_DOT[c.priority])} />
-                  )}
-                  <span className="truncate text-sm text-zinc-100">{c.title}</span>
-                </div>
-                <div className="mt-0.5 flex items-center gap-2 text-[11px] text-zinc-500">
-                  <span>{dueLabel(c.dueDate)}</span>
-                  {c.recurringRule && <span>· 🔁 {c.recurringRule}</span>}
-                </div>
-              </div>
-              <button
-                onClick={() => onAct(c.id, "snooze")}
-                disabled={busy === c.id}
-                className="press shrink-0 rounded-lg px-2 py-1 text-xs text-zinc-400 hover:bg-white/10 hover:text-zinc-200"
-              >
-                Snooze
-              </button>
-              <button
-                onClick={() => onRemove(c.id)}
-                disabled={busy === c.id}
-                aria-label="Remove"
-                className="press shrink-0 rounded-lg px-1.5 py-1 text-xs text-zinc-600 hover:bg-white/10 hover:text-rose-300"
-              >
-                ✕
-              </button>
-            </motion.div>
+              c={c}
+              tone={tone}
+              busy={busy}
+              onAct={onAct}
+              onComplete={onComplete}
+              onRemove={onRemove}
+            />
           ))}
         </AnimatePresence>
       </div>
     </section>
+  );
+}
+
+function Row({
+  c,
+  tone,
+  busy,
+  onAct,
+  onComplete,
+  onRemove,
+}: {
+  c: CommitmentDTO;
+  tone: string;
+  busy: string | null;
+  onAct: (id: string, action: "complete" | "snooze" | "cancel") => void;
+  onComplete: (c: CommitmentDTO) => void;
+  onRemove: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  // Tap to expand only when there's actually more to see.
+  const hasMore = Boolean(c.description) || c.title.length > 42;
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, height: 0, marginTop: 0 }}
+      className={cn("flex items-start gap-3 rounded-xl border p-3.5", TONE[tone])}
+    >
+      <button
+        onClick={() => onComplete(c)}
+        disabled={busy === c.id}
+        aria-label="Mark done"
+        className="press mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border border-white/20 text-transparent transition-colors hover:border-emerald-400 hover:text-emerald-400"
+      >
+        ✓
+      </button>
+
+      <button
+        type="button"
+        onClick={() => hasMore && setOpen((o) => !o)}
+        className={cn("min-w-0 flex-1 text-left", hasMore && "cursor-pointer")}
+      >
+        <div className="flex items-start gap-2">
+          {c.priority && PRIORITY_DOT[c.priority] && (
+            <span className={cn("mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full", PRIORITY_DOT[c.priority])} />
+          )}
+          <span className={cn("text-sm text-zinc-100", !open && "line-clamp-2")}>{c.title}</span>
+          {hasMore && (
+            <span
+              className={cn(
+                "mt-0.5 shrink-0 text-zinc-500 transition-transform",
+                open && "rotate-180",
+              )}
+              aria-hidden
+            >
+              ⌄
+            </span>
+          )}
+        </div>
+        <div className="mt-0.5 flex items-center gap-2 text-[11px] text-zinc-500">
+          <span>{dueLabel(c.dueDate)}</span>
+          {c.recurringRule && <span>· 🔁 {c.recurringRule}</span>}
+        </div>
+        {open && c.description && (
+          <p className="mt-2 whitespace-pre-wrap text-xs leading-relaxed text-zinc-400">{c.description}</p>
+        )}
+      </button>
+
+      <div className="flex shrink-0 items-center gap-1">
+        <button
+          onClick={() => onAct(c.id, "snooze")}
+          disabled={busy === c.id}
+          className="press rounded-lg px-2 py-1 text-xs text-zinc-400 hover:bg-white/10 hover:text-zinc-200"
+        >
+          Snooze
+        </button>
+        <button
+          onClick={() => onRemove(c.id)}
+          disabled={busy === c.id}
+          aria-label="Remove"
+          className="press rounded-lg px-1.5 py-1 text-xs text-zinc-600 hover:bg-white/10 hover:text-rose-300"
+        >
+          ✕
+        </button>
+      </div>
+    </motion.div>
   );
 }
