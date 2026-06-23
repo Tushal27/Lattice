@@ -177,6 +177,7 @@ model ActionLog {
   id         String   @id @default(cuid())
   capability String // create_entry | create_commitment | calendar.create_event | gmail.capture | ...
   summary    String
+  reason     String? // WHY it happened — the trust receipt behind autonomy
   status     String   @default("done") // done | failed | proposed
   source     String   @default("agent") // agent | gmail | calendar | cron | autonomous | user
   entityId   String? // related entry/commitment/event id, if any

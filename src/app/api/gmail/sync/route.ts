@@ -39,7 +39,7 @@ export async function POST(request: Request) {
       sourceId: ex.messageId,
     });
     created.push({ id: c.id, title: c.title, due: dueDate ? dueDate.toISOString() : null });
-    await logAction({ capability: "gmail.capture", summary: `From email → commitment: ${c.title}`, source: "gmail", entityId: c.id });
+    await logAction({ capability: "gmail.capture", summary: `From email → commitment: ${c.title}`, reason: "A recent email contained a concrete action item you'd otherwise have to track manually.", source: "gmail", entityId: c.id });
   }
 
   // Remember every message we looked at, action item or not, so we don't re-scan.

@@ -105,6 +105,7 @@ export async function runAutonomy(): Promise<AutonomyResult> {
       const fresh = due.filter((d) => !seen.has(d.id)).slice(0, 5);
       for (const d of fresh) {
         const start = tomorrowAtLocal(cfg.scheduleHour, cfg.tz);
+        const ageDays = Math.max(1, Math.round((Date.now() - new Date(d.createdAt).getTime()) / 86_400_000));
         const ev = await createEvent({
           summary: `Review decision: ${d.title}`,
           description: "Lattice: enough time has passed — judge how this decision actually turned out.",
@@ -117,6 +118,7 @@ export async function runAutonomy(): Promise<AutonomyResult> {
           await logAction({
             capability: "autonomy.schedule_reviews",
             summary: `Scheduled a review block: ${d.title}`,
+            reason: `Decided ${ageDays} days ago and still ungraded — past the ${cfg.reviewAgeDays}-day review window, so its outcome is worth judging now.`,
             source: "autonomous",
             entityId: d.id,
           });
@@ -142,7 +144,12 @@ export async function runAutonomy(): Promise<AutonomyResult> {
       if (r.sent) {
         nudged.push("resurface");
         actions.push(`Resurfaced ${items.length} buried item${items.length > 1 ? "s" : ""}`);
-        await logAction({ capability: "autonomy.resurface", summary: `Resurfaced ${items.length} buried item(s)`, source: "autonomous" });
+        await logAction({
+          capability: "autonomy.resurface",
+          summary: `Resurfaced ${items.length} buried item(s)`,
+          reason: `These have gone quiet (e.g. “${items[0].title}”). A timed nudge keeps old lessons working instead of being forgotten.`,
+          source: "autonomous",
+        });
       }
     }
   }
@@ -159,7 +166,14 @@ export async function runAutonomy(): Promise<AutonomyResult> {
       if (r.sent) {
         nudged.push("spending");
         actions.push(`Flagged money: ${body}`);
-        await logAction({ capability: "autonomy.spending_alert", summary: `Flagged: ${body}`, source: "autonomous" });
+        await logAction({
+          capability: "autonomy.spending_alert",
+          summary: `Flagged: ${body}`,
+          reason: drift
+            ? "A spending/regret pattern crossed the threshold worth your attention."
+            : "At the current contribution pace, the projection shows the goal missing its deadline.",
+          source: "autonomous",
+        });
       }
     }
   }

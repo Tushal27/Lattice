@@ -426,7 +426,7 @@ async function calendarTool(args: Record<string, unknown>, opts: ExecOpts = {}):
     await logAction({ capability: "calendar.create_event", summary: `Failed to add event: ${title}`, source: "agent", status: "failed" });
     return { tool: "create_calendar_event", ok: false, summary: "Couldn't reach Google Calendar just now." };
   }
-  await logAction({ capability: "calendar.create_event", summary: `Added to calendar: ${title} · ${whenLabel}`, source: "agent", entityId: created.id });
+  await logAction({ capability: "calendar.create_event", summary: `Added to calendar: ${title} · ${whenLabel}`, reason: "You asked me to schedule this, and calendar access is set to Auto.", source: "agent", entityId: created.id });
   return { tool: "create_calendar_event", ok: true, summary: `Added to your calendar: ${title} · ${whenLabel}` };
 }
 

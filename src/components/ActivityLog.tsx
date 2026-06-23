@@ -6,6 +6,7 @@ interface Action {
   id: string;
   capability: string;
   summary: string;
+  reason: string | null;
   status: string;
   source: string;
   createdAt: string;
@@ -70,7 +71,8 @@ export function ActivityLog() {
           <span className="mt-0.5 text-base">{SOURCE_ICON[a.source] ?? "•"}</span>
           <div className="min-w-0 flex-1">
             <p className="text-sm text-zinc-200">{a.summary}</p>
-            <p className="text-[11px] text-zinc-600">
+            {a.reason && <p className="mt-0.5 text-xs leading-relaxed text-zinc-500">Why: {a.reason}</p>}
+            <p className="mt-0.5 text-[11px] text-zinc-600">
               {a.source} · {ago(a.createdAt)}
               {a.status !== "done" && <span className="ml-1 text-amber-400">· {a.status}</span>}
             </p>

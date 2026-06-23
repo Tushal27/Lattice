@@ -133,6 +133,9 @@ const STATEMENTS = [
   // "ADD COLUMN IF NOT EXISTS", so this throws "duplicate column" on an
   // already-migrated DB — which the per-statement guard below swallows.
   `ALTER TABLE "Entry" ADD COLUMN "embedding" TEXT`,
+  // "why" on audit entries, added after ActionLog shipped. Same duplicate-column
+  // guard applies on an already-migrated DB.
+  `ALTER TABLE "ActionLog" ADD COLUMN "reason" TEXT`,
 ];
 
 let done: Promise<void> | null = null;

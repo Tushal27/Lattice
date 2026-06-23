@@ -96,6 +96,8 @@ export async function listTrust(): Promise<TrustView[]> {
 export interface ActionInput {
   capability: string;
   summary: string;
+  /** WHY this happened — the reasoning behind an autonomous/outward action. */
+  reason?: string | null;
   status?: "done" | "failed" | "proposed";
   source?: "agent" | "gmail" | "calendar" | "cron" | "autonomous" | "user" | "file" | "url" | "github";
   entityId?: string | null;
@@ -107,6 +109,7 @@ export async function logAction(input: ActionInput): Promise<void> {
       data: {
         capability: input.capability,
         summary: input.summary,
+        reason: input.reason ?? null,
         status: input.status ?? "done",
         source: input.source ?? "agent",
         entityId: input.entityId ?? null,
@@ -122,6 +125,7 @@ export interface ActionRow {
   id: string;
   capability: string;
   summary: string;
+  reason: string | null;
   status: string;
   source: string;
   entityId: string | null;

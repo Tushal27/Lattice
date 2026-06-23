@@ -261,9 +261,9 @@ export async function seedDemo(): Promise<{ ok: boolean; created?: number; alrea
   const factIds = facts.map((f) => f.id);
 
   // ---- autonomy history (act + report) ------------------------------------
-  await logAction({ capability: "autonomy.schedule_reviews", summary: "Scheduled a review block: angel-round decision", source: "autonomous" });
-  await logAction({ capability: "gmail.capture", summary: "From email → commitment: send the investor update", source: "gmail" });
-  await logAction({ capability: "url.ingest", summary: "Captured from url: How marketplaces bootstrap supply", source: "url" });
+  await logAction({ capability: "autonomy.schedule_reviews", summary: "Scheduled a review block: angel-round decision", reason: "Decided 60 days ago and still ungraded — past the review window, so its outcome is worth judging now.", source: "autonomous" });
+  await logAction({ capability: "gmail.capture", summary: "From email → commitment: send the investor update", reason: "A recent email contained a concrete action item you'd otherwise have to track manually.", source: "gmail" });
+  await logAction({ capability: "url.ingest", summary: "Captured from url: How marketplaces bootstrap supply", reason: "You shared a link; it was distilled into a note and linked into your graph.", source: "url" });
   const actions = await prisma.actionLog.findMany({ orderBy: { createdAt: "desc" }, take: 3, select: { id: true } });
   const actionIds = actions.map((a) => a.id);
 
