@@ -66,9 +66,14 @@ export default function Home() {
           </div>
         </section>
 
-        <ModuleSwitcher />
-
         <DailyBrief />
+
+        {/* Due commitments — surfaced up top so you never have to scroll for them. */}
+        <Suspense fallback={null}>
+          <DashboardDueCommitments />
+        </Suspense>
+
+        <ModuleSwitcher />
 
         <Suspense fallback={<div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">{skeletons(5, "h-28 rounded-2xl")}</div>}>
           <DashboardStats />
@@ -103,6 +108,44 @@ async function DashboardStats() {
   return <StatGrid counts={stats.byType} />;
 }
 
+async function DashboardDueCommitments() {
+  const commitments = await groupedCommitments();
+  const dueNow = [...commitments.overdue, ...commitments.today];
+  if (dueNow.length === 0) return null;
+  const overdue = commitments.overdue.length;
+
+  return (
+    <section className="elev rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-5">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-emerald-200">
+          🎯 Commitments due
+          <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] text-emerald-300">{dueNow.length}</span>
+        </h3>
+        {overdue > 0 && (
+          <span className="rounded-full bg-rose-500/20 px-2 py-0.5 text-[11px] text-rose-300">{overdue} overdue</span>
+        )}
+      </div>
+      <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {dueNow.slice(0, 6).map((c) => {
+          const isOverdue = commitments.overdue.some((o) => o.id === c.id);
+          return (
+            <li key={c.id} className="flex items-start gap-2 rounded-lg bg-black/15 px-3 py-2">
+              <span className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${isOverdue ? "bg-rose-400" : "bg-emerald-400"}`} />
+              <span className="min-w-0 flex-1 text-sm text-zinc-200">
+                {c.title}
+                {isOverdue && <span className="ml-1 text-xs text-rose-300/80">· overdue</span>}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      <Link href="/commitments" className="mt-3 inline-block text-xs font-medium text-emerald-300 hover:underline">
+        View all →
+      </Link>
+    </section>
+  );
+}
+
 async function DashboardInsights() {
   const insights = await activeInsights();
   const items = insights.map((i: InsightRow) => ({
@@ -131,8 +174,7 @@ async function DashboardRecent() {
 }
 
 async function DashboardSideRail() {
-  const [commitments, awaitingReview, openQuestions, money] = await Promise.all([
-    groupedCommitments(),
+  const [awaitingReview, openQuestions, money] = await Promise.all([
     decisionsAwaitingReview(),
     prisma.entry.findMany({
       where: { type: "question", status: "open" },
@@ -143,7 +185,6 @@ async function DashboardSideRail() {
     moneyAnalytics("month"),
   ]);
 
-  const dueNow = [...commitments.overdue, ...commitments.today];
   const moneyWidget = {
     spendTotal: money.spend.total,
     spendCount: money.spend.count,
@@ -153,31 +194,6 @@ async function DashboardSideRail() {
   return (
     <aside className="space-y-6">
       <MoneyWidget data={moneyWidget} />
-
-      {dueNow.length > 0 && (
-        <div className="elev rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4">
-          <h3 className="mb-2 flex items-center justify-between text-sm font-semibold text-emerald-200">
-            <span className="flex items-center gap-2">🎯 Commitments</span>
-            {commitments.overdue.length > 0 && (
-              <span className="rounded-full bg-rose-500/20 px-2 py-0.5 text-[11px] text-rose-300">
-                {commitments.overdue.length} overdue
-              </span>
-            )}
-          </h3>
-          <p className="mb-3 text-xs text-emerald-200/70">Your follow-throughs for today.</p>
-          <ul className="space-y-2">
-            {dueNow.slice(0, 5).map((c) => (
-              <li key={c.id} className="flex items-start gap-2">
-                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
-                <span className="text-sm text-zinc-200">{c.title}</span>
-              </li>
-            ))}
-          </ul>
-          <Link href="/commitments" className="mt-3 inline-block text-xs font-medium text-emerald-300 hover:underline">
-            View all →
-          </Link>
-        </div>
-      )}
 
       {awaitingReview.length > 0 && (
         <div className="elev rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4">
