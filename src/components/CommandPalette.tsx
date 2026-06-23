@@ -113,6 +113,9 @@ export function CommandPalette() {
       keywords: "ai chat wonder partner",
     },
     { id: "nav-timeline", label: "Life Timeline", icon: "🧭", run: () => go("/timeline"), keywords: "history" },
+    { id: "nav-vision", label: "Vision", icon: "🧭", run: () => go("/vision"), keywords: "roadmap future jarvis why founder" },
+    { id: "nav-architecture", label: "Architecture", icon: "🏗️", run: () => go("/architecture"), keywords: "how it works system design memory embeddings graph agent autonomy founder" },
+    { id: "nav-demo", label: "Founder Demo Mode", icon: "🎬", run: () => go("/settings#demo"), keywords: "demo seed sample data showcase founder" },
     {
       id: "nav-settings",
       label: "Settings",

@@ -2,6 +2,7 @@ import { ActivityLog } from "@/components/ActivityLog";
 import { AutonomyConfig } from "@/components/AutonomyConfig";
 import { AutonomyNow } from "@/components/AutonomyNow";
 import { BookmarkletCard } from "@/components/BookmarkletCard";
+import { DemoControl } from "@/components/DemoControl";
 import { GitHubConnect } from "@/components/GitHubConnect";
 import { GoogleConnect } from "@/components/GoogleConnect";
 import { IngestPanel } from "@/components/IngestPanel";
@@ -13,6 +14,7 @@ import { PageHeader } from "@/components/ui";
 export const dynamic = "force-dynamic";
 
 const JUMPS = [
+  { id: "demo", label: "🎬 Demo" },
   { id: "integrations", label: "🔗 Integrations" },
   { id: "ingest", label: "📥 Ingest" },
   { id: "autonomy", label: "🤖 Autonomy" },
@@ -42,6 +44,11 @@ export default function SettingsPage() {
           </a>
         ))}
       </nav>
+
+      <section id="demo" className="scroll-mt-24 space-y-3">
+        <h2 className="section-label px-1">🎬 Demo</h2>
+        <DemoControl />
+      </section>
 
       <section id="integrations" className="scroll-mt-24 space-y-3">
         <h2 className="section-label px-1">🔗 Integrations</h2>

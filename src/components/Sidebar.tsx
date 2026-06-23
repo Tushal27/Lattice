@@ -112,6 +112,9 @@ export function Sidebar() {
         {discover.map((n) => (
           <NavLink key={n.href} {...n} />
         ))}
+        <div className="mt-4 mb-1 px-3 text-[11px] font-medium uppercase tracking-wider text-zinc-600">About</div>
+        <NavLink href="/vision" label="Vision" icon="🧭" />
+        <NavLink href="/architecture" label="Architecture" icon="🏗️" />
         <button
           onClick={() => window.dispatchEvent(new CustomEvent("lattice:open-chat", { detail: { mode: "wonder" } }))}
           className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-zinc-400 transition-colors hover:bg-zinc-800/40 hover:text-zinc-200"
