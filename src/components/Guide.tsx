@@ -48,12 +48,10 @@ export function Guide() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
+    // Reference help — opens only on demand (the “?” button / command). First-run
+    // is handled by the punchier Onboarding component instead.
     const onOpen = () => setOpen(true);
     window.addEventListener("lattice:open-guide", onOpen);
-    try {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (!localStorage.getItem(SEEN_KEY)) setOpen(true);
-    } catch {}
     return () => window.removeEventListener("lattice:open-guide", onOpen);
   }, []);
 

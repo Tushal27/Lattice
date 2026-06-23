@@ -50,6 +50,9 @@ function openCommand() {
 
 export function Sidebar() {
   const [dueCount, setDueCount] = useState(0);
+  // Module areas are deep-dive views, not daily nav — tucked behind a toggle so
+  // the sidebar reads clean and intentional. Everything stays reachable.
+  const [areasOpen, setAreasOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -97,17 +100,25 @@ export function Sidebar() {
         {primary.map((n) => (
           <NavLink key={n.href} {...n} badge={n.href === "/commitments" ? dueCount : undefined} />
         ))}
-        {MODULES.map((m) => (
-          <div key={m.id}>
-            <div className="mt-4 mb-1 flex items-center gap-1.5 px-3 text-[11px] font-medium uppercase tracking-wider text-zinc-600">
-              <span>{m.icon}</span>
-              {m.name}
+        <button
+          onClick={() => setAreasOpen((o) => !o)}
+          className="mt-4 mb-1 flex items-center justify-between px-3 text-[11px] font-medium uppercase tracking-wider text-zinc-600 hover:text-zinc-400"
+        >
+          <span>Browse areas</span>
+          <span className={`transition-transform ${areasOpen ? "rotate-180" : ""}`}>⌄</span>
+        </button>
+        {areasOpen &&
+          MODULES.map((m) => (
+            <div key={m.id}>
+              <div className="mt-3 mb-1 flex items-center gap-1.5 px-3 text-[11px] font-medium uppercase tracking-wider text-zinc-600">
+                <span>{m.icon}</span>
+                {m.name}
+              </div>
+              {m.types.map((t) => (
+                <NavLink key={t.type} href={`/area/${t.slug}`} label={t.plural} icon={t.icon} />
+              ))}
             </div>
-            {m.types.map((t) => (
-              <NavLink key={t.type} href={`/area/${t.slug}`} label={t.plural} icon={t.icon} />
-            ))}
-          </div>
-        ))}
+          ))}
         <div className="mt-4 mb-1 px-3 text-[11px] font-medium uppercase tracking-wider text-zinc-600">Discover</div>
         {discover.map((n) => (
           <NavLink key={n.href} {...n} />

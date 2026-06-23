@@ -125,6 +125,16 @@ export function CommandPalette() {
         "integrations connect google gmail calendar github memory facts autonomy permissions trust notifications push capture link bookmarklet ingest preferences",
     },
     {
+      id: "tour",
+      label: "Take the tour",
+      icon: "🎬",
+      run: () => {
+        close();
+        window.dispatchEvent(new CustomEvent("lattice:open-onboarding"));
+      },
+      keywords: "onboarding intro tour walkthrough get started demo",
+    },
+    {
       id: "help",
       label: "How to use Lattice",
       icon: "❓",
@@ -132,7 +142,7 @@ export function CommandPalette() {
         close();
         window.dispatchEvent(new CustomEvent("lattice:open-guide"));
       },
-      keywords: "help guide onboarding tutorial",
+      keywords: "help guide tutorial reference",
     },
   ];
 
