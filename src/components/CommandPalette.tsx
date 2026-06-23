@@ -114,6 +114,14 @@ export function CommandPalette() {
     },
     { id: "nav-timeline", label: "Life Timeline", icon: "🧭", run: () => go("/timeline"), keywords: "history" },
     {
+      id: "nav-settings",
+      label: "Settings",
+      icon: "⚙️",
+      run: () => go("/settings"),
+      keywords:
+        "integrations connect google gmail calendar github memory facts autonomy permissions trust notifications push capture link bookmarklet ingest preferences",
+    },
+    {
       id: "help",
       label: "How to use Lattice",
       icon: "❓",

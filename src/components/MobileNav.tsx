@@ -32,6 +32,13 @@ export function MobileNav() {
           <span className="text-sm font-semibold tracking-tight">Lattice</span>
         </Link>
         <div className="flex items-center gap-2">
+          <Link
+            href="/settings"
+            aria-label="Settings"
+            className="press grid h-8 w-8 place-items-center rounded-full border border-white/10 bg-white/5 text-sm text-zinc-400"
+          >
+            ⚙️
+          </Link>
           <button
             onClick={() => window.dispatchEvent(new CustomEvent("lattice:open-guide"))}
             aria-label="How to use Lattice"

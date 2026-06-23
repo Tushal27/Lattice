@@ -94,16 +94,19 @@ export function MemoryCard() {
       {facts.length === 0 ? (
         <p className="mt-3 text-sm text-zinc-600">Nothing yet — facts build up as we chat, or add your own above.</p>
       ) : (
-        <ul className="mt-3 flex flex-wrap gap-2">
+        <ul className="mt-3 space-y-1.5">
           {facts.map((f) => (
             <li
               key={f.id}
-              className="group inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-sm text-zinc-200"
+              className="flex items-start gap-2.5 rounded-xl border border-white/8 bg-white/[0.03] px-3 py-2"
             >
-              {f.content}
+              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-violet-400/70" />
+              <span className="min-w-0 flex-1 text-sm leading-relaxed text-zinc-200 [overflow-wrap:anywhere]">
+                {f.content}
+              </span>
               <button
                 onClick={() => remove(f.id)}
-                className="text-zinc-600 hover:text-rose-300"
+                className="press mt-0.5 shrink-0 text-zinc-600 hover:text-rose-300"
                 aria-label="Forget this"
               >
                 ✕
