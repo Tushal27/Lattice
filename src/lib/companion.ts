@@ -584,6 +584,72 @@ export async function extractPeople(
   }
 }
 
+export interface SpendAnalysis {
+  isTransaction: boolean;
+  debit: boolean;
+  amount: number;
+  merchant: string;
+  category: string;
+  thought: string;
+}
+
+// A compact picture of recent spending + the user's values, so a per-transaction
+// "worth it?" thought is grounded in their actual patterns, not generic advice.
+async function spendContextString(): Promise<string> {
+  const a = await moneyAnalytics("month");
+  const cats = a.byCategory
+    .slice(0, 5)
+    .map((c) => `${c.category} ${formatMoney(c.total)}${c.avgValue != null ? ` (value ${c.avgValue.toFixed(1)})` : ""}`)
+    .join(", ");
+  const recent = a.allSpends
+    .slice(0, 6)
+    .map((s) => `${s.title} ${formatMoney(s.amount)}${s.score != null ? ` (${s.score >= 1 ? "worth it" : s.score <= -1 ? "regret" : "mixed"})` : ""}`)
+    .join("; ");
+  const facts = await factsBlock(6);
+  return [
+    `This month: ${formatMoney(a.spend.total)} across ${a.spend.count}.`,
+    cats ? `By category: ${cats}.` : "",
+    recent ? `Recent spends: ${recent}.` : "",
+    facts ? `What matters to me:\n${facts}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+/**
+ * Parse a bank/UPI/card SMS AND form a short, grounded "worth it?" thought in one
+ * pass. Returns null for non-transaction texts (OTPs, promos, balance, credits).
+ */
+export async function analyzeSpendSms(text: string): Promise<SpendAnalysis | null> {
+  // Cheap pre-filter so we don't burn an AI call on OTPs/promos.
+  if (!/(debit|spent|paid|sent|purchase|txn|transaction|deducted|withdraw|rs\.?|inr|₹|upi)/i.test(text)) return null;
+
+  const ctx = await spendContextString();
+  const prompt = [
+    "This is a bank/UPI/card SMS. If it's a COMPLETED outgoing payment (a debit — money left my account), extract it and give me a short, honest 'worth it?' thought grounded in my spending context below. If it's NOT an outgoing debit (OTP, promo, balance, a credit/refund/received money), set isTransaction to false.",
+    "",
+    `My spending context:\n${ctx}`,
+    "",
+    `SMS: """${text.slice(0, 600)}"""`,
+    "",
+    'Respond with ONLY JSON: {"isTransaction":true|false,"debit":true|false,"amount":<number>,"merchant":"who I paid","category":"Essentials|Food|Health|Learning|Tools/Software|Family|Experiences|Lifestyle|Transport|Other","thought":"1-2 sentences, specific and honest: does this fit my patterns/values? a streak worth noticing? Never preachy or generic."}',
+  ].join("\n");
+
+  const ai = await generate(prompt, { system: THINKING_PARTNER_SYSTEM, temperature: 0.4 });
+  if (!ai) return null;
+  const parsed = safeJson(ai);
+  if (!parsed) return null;
+  const amount = Number(parsed.amount);
+  return {
+    isTransaction: parsed.isTransaction === true,
+    debit: parsed.debit !== false,
+    amount: Number.isFinite(amount) ? amount : 0,
+    merchant: String(parsed.merchant ?? "Payment").slice(0, 100),
+    category: String(parsed.category ?? "Other").slice(0, 40),
+    thought: String(parsed.thought ?? "").slice(0, 400),
+  };
+}
+
 export async function connectionInsight(entryId: string) {
   const entry = await getEntry(entryId);
   if (!entry) return { source: "local" as const, text: "Entry not found.", suggestions: [] };

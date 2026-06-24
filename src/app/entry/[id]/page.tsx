@@ -35,7 +35,9 @@ export default async function EntryPage(props: PageProps<"/entry/[id]">) {
   const a = accent(cfg.accent);
 
   const values = entryToFormValues(entry, entry.type);
-  const aiDraft = parseFields(entry.fields).aiDraft as string | undefined;
+  const entryFields = parseFields(entry.fields);
+  const aiDraft = entryFields.aiDraft as string | undefined;
+  const aiThought = entryFields.aiThought as string | undefined;
   const reviewFields = cfg.fields.filter((f) => f.review && values[f.key]);
   const reviewed = Boolean(cfg.reviewable) && reviewFields.length > 0;
   const reviewedAt = parseFields(entry.fields).reviewedAt;
@@ -179,6 +181,16 @@ export default async function EntryPage(props: PageProps<"/entry/[id]">) {
               <Link href={`/entry/${entry.id}/edit`} className="mt-2 inline-block text-xs font-medium text-violet-300 hover:underline">
                 Refine or accept →
               </Link>
+            </div>
+          )}
+
+          {aiThought && (
+            <div className="mb-6 rounded-xl border border-amber-500/25 bg-gradient-to-b from-amber-500/10 to-transparent p-4">
+              <div className="mb-1.5 flex items-center gap-2 text-sm font-semibold text-amber-200">
+                💭 Worth it?
+                <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-normal text-zinc-400">AI · from your patterns</span>
+              </div>
+              <p className="leading-relaxed text-zinc-200 [overflow-wrap:anywhere]">{aiThought}</p>
             </div>
           )}
 
