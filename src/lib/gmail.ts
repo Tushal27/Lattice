@@ -143,3 +143,45 @@ export async function markSeen(ids: string[]): Promise<void> {
   const merged = Array.from(new Set([...prev, ...ids])).slice(-500);
   await writeState(SEEN_KEY, JSON.stringify(merged));
 }
+
+/** Pull the bare email address out of a "Name <addr>" From header. */
+export function parseAddress(from: string): string {
+  const m = from.match(/<([^>]+)>/);
+  return (m ? m[1] : from).trim();
+}
+
+// ---- triage proposals (reply drafts + renewal warnings awaiting your action) --
+const PROPOSALS_KEY = "gmail:proposals";
+
+export interface Proposal {
+  id: string;
+  kind: "reply" | "renewal";
+  from: string;
+  to?: string;
+  subject?: string;
+  body?: string; // draft reply
+  summary: string;
+  createdAt: number;
+}
+
+export async function listProposals(): Promise<Proposal[]> {
+  try {
+    return (JSON.parse((await readState(PROPOSALS_KEY)) ?? "[]") as Proposal[]) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export async function addProposals(items: Proposal[]): Promise<void> {
+  if (items.length === 0) return;
+  const existing = await listProposals();
+  const byId = new Map(existing.map((p) => [p.id, p]));
+  for (const p of items) byId.set(p.id, p); // newest wins
+  const merged = [...byId.values()].sort((a, b) => b.createdAt - a.createdAt).slice(0, 40);
+  await writeState(PROPOSALS_KEY, JSON.stringify(merged));
+}
+
+export async function dismissProposal(id: string): Promise<void> {
+  const merged = (await listProposals()).filter((p) => p.id !== id);
+  await writeState(PROPOSALS_KEY, JSON.stringify(merged));
+}

@@ -9,6 +9,7 @@ import { IngestPanel } from "@/components/IngestPanel";
 import { MemoryCard } from "@/components/MemoryCard";
 import { NotificationToggle } from "@/components/NotificationToggle";
 import { PermissionSettings } from "@/components/PermissionSettings";
+import { TriagePanel } from "@/components/TriagePanel";
 import { PageHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -54,6 +55,7 @@ export default function SettingsPage() {
         <h2 className="section-label px-1">🔗 Integrations</h2>
         <p className="px-1 text-sm text-zinc-500">Let Lattice see your world. Connect once; control access below.</p>
         <GoogleConnect />
+        <TriagePanel />
         <GitHubConnect />
       </section>
 

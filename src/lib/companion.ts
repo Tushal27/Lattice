@@ -417,6 +417,81 @@ export async function extractFromEmails(
     .filter((x): x is EmailExtraction => x !== null);
 }
 
+export interface EmailTriage {
+  messageId: string;
+  kind: "commitment" | "reply" | "renewal" | "skip";
+  title: string;
+  summary: string;
+  due: string; // for commitments
+  draft: string; // a full draft reply, for kind === "reply"
+}
+
+/**
+ * Reads recent emails and triages each: a commitment (action item), a reply
+ * (someone's waiting on me — with a full drafted response), a renewal (a
+ * subscription/bill about to charge), or skip. One AI pass over the batch.
+ */
+export async function triageEmails(
+  messages: { id: string; from: string; subject: string; snippet: string; body: string }[],
+): Promise<EmailTriage[]> {
+  if (messages.length === 0) return [];
+
+  const blocks = messages
+    .map(
+      (m, i) =>
+        `--- EMAIL ${i} (id: ${m.id}) ---\nFrom: ${m.from}\nSubject: ${m.subject}\nBody: ${(m.body || m.snippet).slice(0, 1800)}`,
+    )
+    .join("\n\n");
+
+  const prompt = [
+    "Triage each email below into exactly one kind:",
+    "- commitment: it implies a concrete task/deadline I personally must do.",
+    "- reply: a real person is waiting for my response. Write a complete, polite, ready-to-send draft reply in my voice (greeting + body + sign-off). Do NOT invent facts I haven't given — keep it reasonable and brief.",
+    "- renewal: a subscription, bill, or payment about to charge/renew (note the service and amount/date if present).",
+    "- skip: newsletters, marketing, notifications, FYI-only, automated noise.",
+    "Be conservative; most promotional mail is skip.",
+    "",
+    blocks,
+    "",
+    'Respond with ONLY a JSON array, one object per email:',
+    '{"id":"<email id>","kind":"commitment|reply|renewal|skip","title":"short label","summary":"one line of context","due":"natural-language deadline if a commitment, else empty","draft":"the full reply text if kind is reply, else empty"}',
+  ].join("\n");
+
+  const ai = await generate(prompt, { system: THINKING_PARTNER_SYSTEM, temperature: 0.3 });
+  if (!ai) return messages.map((m) => ({ messageId: m.id, kind: "skip" as const, title: "", summary: "", due: "", draft: "" }));
+
+  const cleaned = ai.replace(/```json/gi, "").replace(/```/g, "").trim();
+  const start = cleaned.indexOf("[");
+  const end = cleaned.lastIndexOf("]");
+  if (start === -1 || end === -1) return [];
+  let arr: unknown;
+  try {
+    arr = JSON.parse(jsonrepair(cleaned.slice(start, end + 1)));
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(arr)) return [];
+
+  const valid = new Set(["commitment", "reply", "renewal", "skip"]);
+  return arr
+    .map((row): EmailTriage | null => {
+      if (!row || typeof row !== "object") return null;
+      const r = row as Record<string, unknown>;
+      const id = String(r.id ?? "");
+      if (!id) return null;
+      const kind = valid.has(String(r.kind)) ? (String(r.kind) as EmailTriage["kind"]) : "skip";
+      return {
+        messageId: id,
+        kind,
+        title: String(r.title ?? "").slice(0, 140),
+        summary: String(r.summary ?? "").slice(0, 280),
+        due: String(r.due ?? "").slice(0, 80),
+        draft: String(r.draft ?? "").slice(0, 4000),
+      };
+    })
+    .filter((x): x is EmailTriage => x !== null);
+}
+
 export async function connectionInsight(entryId: string) {
   const entry = await getEntry(entryId);
   if (!entry) return { source: "local" as const, text: "Entry not found.", suggestions: [] };

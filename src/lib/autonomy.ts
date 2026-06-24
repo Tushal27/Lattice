@@ -2,6 +2,8 @@ import { calendarConnected, createEvent } from "@/lib/calendar";
 import { getTrust, logAction } from "@/lib/capabilities";
 import { prisma } from "@/lib/db";
 import { decisionsAwaitingReview, resurface } from "@/lib/entries";
+import { gmailConnected } from "@/lib/gmail";
+import { runInboxScan } from "@/lib/inbox";
 import { activeInsights } from "@/lib/insights";
 import { moneyGoalRisks } from "@/lib/money";
 import { pushEnabled, sendPushToAll } from "@/lib/push";
@@ -127,6 +129,23 @@ export async function runAutonomy(): Promise<AutonomyResult> {
       if (scheduled > 0) {
         await writeSet("autonomy:scheduled-reviews", seen);
         actions.push(`Scheduled ${scheduled} decision review${scheduled > 1 ? "s" : ""}`);
+      }
+    }
+  }
+
+  // 1b. Auto-triage the inbox (when Gmail capture is on Auto): action items →
+  //     commitments, reply-worthy mail → draft replies, renewals → alerts.
+  if ((await getTrust("gmail.capture")) === "auto" && (await gmailConnected()) && (await onceToday("autonomy:inbox:lastrun"))) {
+    const r = await runInboxScan(cfg.tz).catch(() => null);
+    if (r && (r.created.length || r.proposed)) {
+      actions.push(`Inbox: ${r.created.length} action item(s), ${r.replies} reply draft(s), ${r.renewals} renewal alert(s)`);
+      if (!quiet && pushEnabled() && (r.replies || r.created.length)) {
+        await sendPushToAll({
+          title: "Inbox triaged",
+          body: [r.created.length ? `${r.created.length} to do` : "", r.replies ? `${r.replies} reply draft(s)` : ""].filter(Boolean).join(" · "),
+          url: "/settings#integrations",
+          tag: "lattice-inbox",
+        });
       }
     }
   }

@@ -1,5 +1,5 @@
-import { runAutonomy } from "@/lib/autonomy";
-import { dailyBrief } from "@/lib/companion";
+import { getAutonomyConfig, runAutonomy } from "@/lib/autonomy";
+import { dailyBrief, reflection } from "@/lib/companion";
 import { groupedCommitments } from "@/lib/commitments";
 import { refreshInsights } from "@/lib/insights";
 import { drainJobs } from "@/lib/jobs";
@@ -50,12 +50,23 @@ async function run(request: Request) {
       if (insights.length > 0) lines.push(`💡 ${insights.length} insight${insights.length > 1 ? "s" : ""}`);
       body = lines.join(" · ");
     }
+    const resolved = kind === "auto" ? (new Date().getHours() < 16 ? "morning" : "evening") : kind;
     if (body) {
-      const heading = (kind === "auto" ? (new Date().getHours() < 16 ? "morning" : "evening") : kind) === "evening"
-        ? "Your evening brief"
-        : "Your morning brief";
+      const heading = resolved === "evening" ? "Your evening brief" : "Your morning brief";
       const r = await sendPushToAll({ title: heading, body, url: "/", tag: "lattice-brief" });
       sent = r.sent;
+    }
+
+    // Weekly reflection — once a week, on Sunday evening (the user's local day).
+    if (resolved === "evening") {
+      const cfg = await getAutonomyConfig();
+      const localDay = new Date(Date.now() + cfg.tz * 60000).getUTCDay(); // 0 = Sunday
+      if (localDay === 0) {
+        const refl = await reflection("week");
+        let rb = refl.text.replace(/[#*_`>]/g, "").replace(/\s+/g, " ").trim();
+        if (rb.length > 180) rb = rb.slice(0, 177).trimEnd() + "…";
+        if (rb) await sendPushToAll({ title: "Your week in review", body: rb, url: "/reflect", tag: "lattice-weekly" });
+      }
     }
   }
 
