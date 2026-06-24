@@ -248,22 +248,34 @@ function resolveKind(kind: BriefKind): "morning" | "evening" {
   return new Date().getHours() < 16 ? "morning" : "evening";
 }
 
-async function calendarLines(): Promise<{ today: string[]; count: number }> {
+async function calendarLines(): Promise<{ today: string[]; count: number; nextContext: string }> {
   try {
-    if (!(await calendarConnected())) return { today: [], count: 0 };
+    if (!(await calendarConnected())) return { today: [], count: 0, nextContext: "" };
     const events = await upcomingEvents({ days: 2, max: 12 });
     const todayStr = new Date().toDateString();
-    const today = events
-      .filter((e) => e.start && new Date(e.start).toDateString() === todayStr)
-      .map((e) => {
-        const t = e.allDay
-          ? "all day"
-          : new Date(e.start).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-        return `- ${t} · ${e.summary}${e.location ? ` @ ${e.location}` : ""}`;
-      });
-    return { today, count: today.length };
+    const todayEvents = events.filter((e) => e.start && new Date(e.start).toDateString() === todayStr);
+    const today = todayEvents.map((e) => {
+      const t = e.allDay
+        ? "all day"
+        : new Date(e.start).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+      return `- ${t} · ${e.summary}${e.location ? ` @ ${e.location}` : ""}`;
+    });
+
+    // Meeting prep: for the next still-upcoming, non-all-day event, pull what the
+    // user's brain already knows that's relevant — so the brief preps them.
+    let nextContext = "";
+    const now = Date.now();
+    const next = todayEvents.find((e) => !e.allDay && e.start && new Date(e.start).getTime() > now);
+    if (next?.summary) {
+      const related = await relevantEntries(next.summary, 3);
+      if (related.length) {
+        const when = new Date(next.start).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+        nextContext = `Prep for your next meeting ("${next.summary}" at ${when}) — what I already know that's relevant:\n${digest(related)}`;
+      }
+    }
+    return { today, count: today.length, nextContext };
   } catch {
-    return { today: [], count: 0 };
+    return { today: [], count: 0, nextContext: "" };
   }
 }
 
@@ -299,6 +311,7 @@ export async function dailyBrief(kind: BriefKind = "auto"): Promise<SourcedText>
 
   const facts = [
     cal.count ? `On my calendar today:\n${cal.today.join("\n")}` : "",
+    when === "morning" && cal.nextContext ? cal.nextContext : "",
     dueNow.length
       ? `Commitments due now (${dueNow.length}):\n${dueNow.map((c) => `- ${c.title}${commitments.overdue.some((o) => o.id === c.id) ? " (OVERDUE)" : " (today)"}`).join("\n")}`
       : "",
