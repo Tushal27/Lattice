@@ -42,12 +42,32 @@ async function alreadySeen(text: string): Promise<boolean> {
   return false;
 }
 
-export async function POST(request: Request) {
+// Accept the SMS text from wherever it's easiest for the phone automation app:
+// a ?text= query param (simplest — GET works), a JSON body, or a form body.
+async function readText(request: Request, url: URL): Promise<string> {
+  const q = url.searchParams.get("text") || url.searchParams.get("message") || url.searchParams.get("sms");
+  if (q) return q.trim();
+  const ct = request.headers.get("content-type") ?? "";
+  try {
+    if (ct.includes("application/json")) {
+      const b = (await request.json()) as { text?: string; message?: string; sms?: string };
+      return String(b.text ?? b.message ?? b.sms ?? "").trim();
+    }
+    if (ct.includes("form")) {
+      const f = await request.formData();
+      return String(f.get("text") ?? f.get("message") ?? f.get("sms") ?? "").trim();
+    }
+    return (await request.text()).trim();
+  } catch {
+    return "";
+  }
+}
+
+async function handle(request: Request) {
   const url = new URL(request.url);
   if (!(await authed(request, url))) return new Response("Unauthorized", { status: 401 });
 
-  const body = (await request.json().catch(() => ({}))) as { text?: string; message?: string; sms?: string };
-  const text = String(body.text ?? body.message ?? body.sms ?? "").trim();
+  const text = await readText(request, url);
   if (!text) return Response.json({ error: "No SMS text provided." }, { status: 400 });
 
   if (await alreadySeen(text)) return Response.json({ ok: true, skipped: "duplicate" });
@@ -99,4 +119,13 @@ export async function POST(request: Request) {
   }
 
   return Response.json({ ok: true, created: entry.id, amount: a.amount, category: a.category, thought: a.thought });
+}
+
+// Both verbs work, so the phone app can use whichever is simplest (a GET with
+// ?text=… is the easiest to set up).
+export async function GET(request: Request) {
+  return handle(request);
+}
+export async function POST(request: Request) {
+  return handle(request);
 }
