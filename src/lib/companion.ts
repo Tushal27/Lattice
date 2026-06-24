@@ -505,6 +505,25 @@ export async function triageEmails(
     .filter((x): x is EmailTriage => x !== null);
 }
 
+/**
+ * Draft a strong first-pass answer to an open question — grounded in the user's
+ * own relevant notes plus the model's reasoning. Robust: works with just an AI
+ * key (no external search dependency); returns null only if the AI is down.
+ */
+export async function researchQuestion(title: string, summary = ""): Promise<string | null> {
+  const related = await relevantEntries(`${title} ${summary}`.trim(), 8);
+  const prompt = [
+    "I captured this open question and want a strong first-draft answer to react to and refine.",
+    `Question: ${title}${summary ? `\nContext: ${summary}` : ""}`,
+    related.length ? `\nFrom my own notes that may be relevant:\n${digest(related)}` : "",
+    "",
+    "Write a clear, well-reasoned draft: take a position, lay out the key considerations/options and trade-offs, and end with a concrete recommendation or next step. Ground it in my notes where they're relevant, be honest about uncertainty, and keep it tight and genuinely useful — this is a draft I'll refine, not a final answer.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+  return generate(prompt, { system: WONDER_SYSTEM, temperature: 0.6 });
+}
+
 export async function connectionInsight(entryId: string) {
   const entry = await getEntry(entryId);
   if (!entry) return { source: "local" as const, text: "Entry not found.", suggestions: [] };

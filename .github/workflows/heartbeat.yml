@@ -1,0 +1,29 @@
+name: Lattice heartbeat
+
+# A frequent, reliable trigger — every 15 minutes — so background work, inbox
+# triage, question research, briefs, and autonomy run responsively instead of
+# only twice a day (Vercel Hobby crons are limited). The endpoint is idempotent,
+# so calling it often is safe.
+#
+# Setup (one time): add two repo secrets under Settings → Secrets → Actions:
+#   LATTICE_URL  = https://your-app.vercel.app   (no trailing slash)
+#   CRON_SECRET  = the same value as the app's CRON_SECRET env var
+# GitHub may delay scheduled runs under load; that's fine — the guards handle it.
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping the heartbeat
+        run: |
+          if [ -z "${{ secrets.LATTICE_URL }}" ]; then
+            echo "LATTICE_URL secret not set — skipping."; exit 0
+          fi
+          curl -fsS --max-time 60 -X POST "${{ secrets.LATTICE_URL }}/api/cron/tick" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" -d '{}' || echo "tick failed (will retry next run)"

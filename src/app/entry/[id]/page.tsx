@@ -35,6 +35,7 @@ export default async function EntryPage(props: PageProps<"/entry/[id]">) {
   const a = accent(cfg.accent);
 
   const values = entryToFormValues(entry, entry.type);
+  const aiDraft = parseFields(entry.fields).aiDraft as string | undefined;
   const reviewFields = cfg.fields.filter((f) => f.review && values[f.key]);
   const reviewed = Boolean(cfg.reviewable) && reviewFields.length > 0;
   const reviewedAt = parseFields(entry.fields).reviewedAt;
@@ -165,6 +166,19 @@ export default async function EntryPage(props: PageProps<"/entry/[id]">) {
               {entry.tags.map((t) => (
                 <TagChip key={t.tag.name} name={t.tag.name} />
               ))}
+            </div>
+          )}
+
+          {aiDraft && (
+            <div className="mb-6 rounded-xl border border-violet-500/25 bg-gradient-to-b from-violet-500/10 to-transparent p-4">
+              <div className="mb-1.5 flex items-center gap-2 text-sm font-semibold text-violet-200">
+                ✦ Draft answer
+                <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-normal text-zinc-400">AI · review &amp; refine</span>
+              </div>
+              <p className="whitespace-pre-line leading-relaxed text-zinc-200 [overflow-wrap:anywhere]">{aiDraft}</p>
+              <Link href={`/entry/${entry.id}/edit`} className="mt-2 inline-block text-xs font-medium text-violet-300 hover:underline">
+                Refine or accept →
+              </Link>
             </div>
           )}
 

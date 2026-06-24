@@ -1,12 +1,14 @@
 import { calendarConnected, createEvent } from "@/lib/calendar";
 import { getTrust, logAction } from "@/lib/capabilities";
 import { prisma } from "@/lib/db";
+import { researchQuestion } from "@/lib/companion";
 import { decisionsAwaitingReview, resurface } from "@/lib/entries";
 import { gmailConnected } from "@/lib/gmail";
 import { runInboxScan } from "@/lib/inbox";
 import { activeInsights } from "@/lib/insights";
 import { moneyGoalRisks } from "@/lib/money";
 import { pushEnabled, sendPushToAll } from "@/lib/push";
+import { parseFields } from "@/lib/utils";
 
 // The autonomy engine — the "act, then report" tier. It runs from the cron/event
 // path and only acts on capabilities the user has dialed to AUTO; the ASK tier is
@@ -146,6 +148,40 @@ export async function runAutonomy(): Promise<AutonomyResult> {
           url: "/settings#integrations",
           tag: "lattice-inbox",
         });
+      }
+    }
+  }
+
+  // 1c. Auto-research open questions → a draft answer attached to each question.
+  if ((await getTrust("autonomy.research_questions")) === "auto") {
+    const questions = await prisma.entry.findMany({
+      where: { type: "question", status: "open" },
+      orderBy: { createdAt: "desc" },
+      take: 12,
+      select: { id: true, title: true, summary: true, fields: true },
+    });
+    const undrafted = questions.filter((q) => !parseFields(q.fields).aiDraft).slice(0, 3);
+    let drafted = 0;
+    for (const q of undrafted) {
+      const draft = await researchQuestion(q.title, q.summary ?? "").catch(() => null);
+      if (!draft) continue;
+      const f = parseFields(q.fields);
+      f.aiDraft = draft;
+      f.aiDraftAt = new Date().toISOString();
+      await prisma.entry.update({ where: { id: q.id }, data: { fields: JSON.stringify(f) } });
+      drafted++;
+      await logAction({
+        capability: "autonomy.research_questions",
+        summary: `Drafted an answer to: ${q.title}`,
+        reason: "You left this question open; I researched a first-draft answer from your notes for you to react to.",
+        source: "autonomous",
+        entityId: q.id,
+      });
+    }
+    if (drafted) {
+      actions.push(`Drafted answers to ${drafted} open question${drafted > 1 ? "s" : ""}`);
+      if (!quiet && pushEnabled()) {
+        await sendPushToAll({ title: "Draft answers ready", body: `I drafted answers to ${drafted} of your open questions`, url: "/questions", tag: "lattice-research" });
       }
     }
   }

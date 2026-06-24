@@ -68,6 +68,13 @@ export const CAPABILITIES: CapabilitySpec[] = [
     defaultTrust: "auto",
     outward: false,
   },
+  {
+    key: "autonomy.research_questions",
+    label: "Auto-research open questions",
+    description: "Draft a well-reasoned answer to each open question I capture, grounded in my notes — for me to react to.",
+    defaultTrust: "auto",
+    outward: false,
+  },
 ];
 
 const PERM_PREFIX = "perm:";
