@@ -1,27 +1,57 @@
+import { CAPABILITIES, getTrust } from "@/lib/capabilities";
+import { prisma } from "@/lib/db";
+import { googleConnected, googleEnabled } from "@/lib/google";
 import { runHeartbeat } from "@/lib/heartbeat";
-
-// The heartbeat endpoint — call it as often as you like (GitHub Actions every
-// 15 min is ideal; Vercel Cron hits it too as a fallback). It's idempotent:
-// time-gated guards mean nothing fires more than once per slot per day.
+import { pushEnabled, subscriptionCount } from "@/lib/push";
 
 export const dynamic = "force-dynamic";
 
-async function run(request: Request) {
+function authed(request: Request, url: URL): boolean {
   const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const url = new URL(request.url);
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${secret}` && url.searchParams.get("secret") !== secret) {
-      return new Response("Unauthorized", { status: 401 });
-    }
-  }
-  const result = await runHeartbeat();
+  if (!secret) return true;
+  const auth = request.headers.get("authorization");
+  return auth === `Bearer ${secret}` || url.searchParams.get("secret") === secret;
+}
+
+// POST = run the heartbeat (Vercel Cron with ?slot=…, or GitHub Actions w/o slot).
+async function run(request: Request) {
+  const url = new URL(request.url);
+  if (!authed(request, url)) return new Response("Unauthorized", { status: 401 });
+  const slotParam = url.searchParams.get("slot");
+  const slot = slotParam === "morning" || slotParam === "evening" ? slotParam : null;
+  const result = await runHeartbeat(slot);
   return Response.json({ ok: true, ...result });
 }
 
-export async function GET(request: Request) {
-  return run(request);
-}
 export async function POST(request: Request) {
   return run(request);
+}
+
+// GET = a no-side-effect health snapshot, so you can verify the pipeline is live:
+//   curl https://app/api/cron/tick?secret=…
+export async function GET(request: Request) {
+  const url = new URL(request.url);
+  if (!authed(request, url)) return new Response("Unauthorized", { status: 401 });
+
+  const [subs, last, autos] = await Promise.all([
+    subscriptionCount().catch(() => 0),
+    prisma.appState.findUnique({ where: { key: "hb:last" } }).catch(() => null),
+    Promise.all(
+      CAPABILITIES.map(async (c) => ({ key: c.key, trust: await getTrust(c.key) })),
+    ),
+  ]);
+
+  return Response.json({
+    ok: true,
+    health: {
+      pushEnabled: pushEnabled(),
+      pushSubscriptions: subs,
+      googleConfigured: googleEnabled(),
+      googleConnected: googleEnabled() ? await googleConnected() : false,
+      lastHeartbeat: last?.value ?? null,
+      cronSecretSet: Boolean(process.env.CRON_SECRET),
+      capabilities: autos,
+    },
+    hint: "POST this URL to run the heartbeat. Vercel Cron adds ?slot=morning|evening; GitHub Actions calls it bare every 15 min.",
+  });
 }

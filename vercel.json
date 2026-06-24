@@ -1,11 +1,11 @@
 {
   "crons": [
     {
-      "path": "/api/cron/tick",
+      "path": "/api/cron/tick?slot=morning",
       "schedule": "30 2 * * *"
     },
     {
-      "path": "/api/cron/tick",
+      "path": "/api/cron/tick?slot=evening",
       "schedule": "30 14 * * *"
     }
   ]

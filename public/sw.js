@@ -5,7 +5,7 @@
 //  - Static assets (_next, icons, fonts): stale-while-revalidate.
 //  - API requests: always network (data should never be stale silently).
 
-const VERSION = "lattice-v2";
+const VERSION = "lattice-v3";
 const PRECACHE = `precache-${VERSION}`;
 const RUNTIME = `runtime-${VERSION}`;
 const PRECACHE_URLS = ["/offline", "/icon-192.png", "/icon-512.png", "/manifest.webmanifest"];
@@ -78,20 +78,34 @@ self.addEventListener("push", (event) => {
   } catch {
     if (event.data) data.body = event.data.text();
   }
-  event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: "/icon-192.png",
-      badge: "/icon-192.png",
-      tag: data.tag || "lattice",
-      data: { url: data.url || "/" },
-    }),
-  );
+  const options = {
+    body: data.body,
+    icon: "/icon-192.png",
+    badge: "/icon-192.png",
+    tag: data.tag || "lattice",
+    data: { url: data.url || "/", entryId: data.entryId || null },
+  };
+  if (Array.isArray(data.actions)) options.actions = data.actions;
+  event.waitUntil(self.registration.showNotification(data.title, options));
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const target = (event.notification.data && event.notification.data.url) || "/";
+  const d = event.notification.data || {};
+
+  // Tap-to-rate a spend straight from the notification — no app needed.
+  if ((event.action === "worth" || event.action === "regret") && d.entryId) {
+    event.waitUntil(
+      fetch("/api/expense/rate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: d.entryId, rating: event.action }),
+      }).catch(function () {}),
+    );
+    return;
+  }
+
+  const target = d.url || "/";
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
       for (const client of clients) {

@@ -47,6 +47,15 @@ export interface PushPayload {
   body: string;
   url?: string;
   tag?: string;
+  /** Notification action buttons, e.g. tap-to-rate a spend. */
+  actions?: { action: string; title: string }[];
+  /** Entry this notification acts on (used by action buttons in the SW). */
+  entryId?: string;
+}
+
+/** How many devices are subscribed to push — for health/diagnostics. */
+export async function subscriptionCount(): Promise<number> {
+  return prisma.pushSubscription.count();
 }
 
 /** Send a notification to every stored subscription. Prunes dead ones. */

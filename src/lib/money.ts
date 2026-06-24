@@ -3,10 +3,11 @@
 // satisfaction live in the entry `fields` JSON and are parsed here.
 
 import { prisma } from "@/lib/db";
-import { parseAmount, projectGoal, type GoalProjection } from "@/lib/format";
+import { formatMoney, parseAmount, projectGoal, type GoalProjection } from "@/lib/format";
 import { parseFields } from "@/lib/utils";
 
-export { formatMoney, parseAmount } from "@/lib/format";
+export { parseAmount } from "@/lib/format";
+export { formatMoney };
 export type { GoalProjection } from "@/lib/format";
 
 export interface ProjectedGoal {
@@ -86,6 +87,39 @@ export async function goalsWithProjection(): Promise<ProjectedGoal[]> {
 }
 
 /** Goals that, on current trajectory, will miss their target by the deadline. */
+/** A one-line week-over-week spending trend, for the Sunday push. */
+export async function weeklySpendTrend(): Promise<string | null> {
+  const exp = (await moneyEntries()).filter((e) => e.type === "expense");
+  const now = Date.now();
+  const wk = 7 * 86_400_000;
+  const thisWeek = exp.filter((e) => now - e.when.getTime() < wk);
+  const lastWeek = exp.filter((e) => {
+    const d = now - e.when.getTime();
+    return d >= wk && d < 2 * wk;
+  });
+  if (thisWeek.length === 0 && lastWeek.length === 0) return null;
+
+  const tw = thisWeek.reduce((s, e) => s + e.amount, 0);
+  const lw = lastWeek.reduce((s, e) => s + e.amount, 0);
+  const catThis = new Map<string, number>();
+  for (const e of thisWeek) catThis.set(e.category, (catThis.get(e.category) ?? 0) + e.amount);
+  const catLast = new Map<string, number>();
+  for (const e of lastWeek) catLast.set(e.category, (catLast.get(e.category) ?? 0) + e.amount);
+  const top = [...catThis.entries()].sort((a, b) => b[1] - a[1])[0];
+
+  let line = `${formatMoney(tw)} this week across ${thisWeek.length}`;
+  if (lw > 0) {
+    const pct = Math.round(((tw - lw) / lw) * 100);
+    line += `, ${pct >= 0 ? "up" : "down"} ${Math.abs(pct)}% vs last week`;
+  }
+  if (top) {
+    const last = catLast.get(top[0]) ?? 0;
+    const cp = last > 0 ? Math.round(((top[1] - last) / last) * 100) : null;
+    line += `. Most on ${top[0]} (${formatMoney(top[1])}${cp != null ? `, ${cp >= 0 ? "+" : ""}${cp}%` : ""}).`;
+  }
+  return line;
+}
+
 export async function moneyGoalRisks(): Promise<ProjectedGoal[]> {
   const goals = await goalsWithProjection();
   return goals.filter((g) => g.projection.status === "behind" && g.projection.monthsLeft > 0 && g.monthly > 0);

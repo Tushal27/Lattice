@@ -89,6 +89,12 @@ export async function POST(request: Request) {
       body: a.thought,
       url: `/entry/${entry.id}`,
       tag: "lattice-spend",
+      entryId: entry.id,
+      // Tap-to-rate straight from the notification.
+      actions: [
+        { action: "worth", title: "👍 Worth it" },
+        { action: "regret", title: "👎 Regret" },
+      ],
     }).catch(() => {});
   }
 
