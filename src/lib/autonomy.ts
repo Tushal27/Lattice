@@ -7,6 +7,7 @@ import { gmailConnected } from "@/lib/gmail";
 import { runInboxScan } from "@/lib/inbox";
 import { activeInsights } from "@/lib/insights";
 import { moneyGoalRisks } from "@/lib/money";
+import { ensurePeopleFromEntries } from "@/lib/people";
 import { pushEnabled, sendPushToAll } from "@/lib/push";
 import { parseFields } from "@/lib/utils";
 
@@ -184,6 +185,12 @@ export async function runAutonomy(): Promise<AutonomyResult> {
         await sendPushToAll({ title: "Draft answers ready", body: `I drafted answers to ${drafted} of your open questions`, url: "/questions", tag: "lattice-research" });
       }
     }
+  }
+
+  // 1d. Keep the people index fresh from recent entries (CRM-lite).
+  if ((await getTrust("autonomy.people")) === "auto" && (await onceToday("autonomy:people:lastrun"))) {
+    const n = await ensurePeopleFromEntries().catch(() => 0);
+    if (n) actions.push(`Updated people index from ${n} mention(s)`);
   }
 
   // 2. Resurface forgotten work — a single gentle nudge per day, outside quiet hours.

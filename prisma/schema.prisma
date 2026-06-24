@@ -156,6 +156,22 @@ model Memory {
   @@index([kind])
 }
 
+// CRM-lite: people the user works with, auto-derived from their entries (and
+// optionally Google Contacts). Holds an aggregated "what I know about them" so
+// the assistant can prep the user before a meeting or email.
+model Person {
+  id        String   @id @default(cuid())
+  name      String
+  aka       String? // email / alias
+  summary   String? // aggregated context about them
+  mentions  String? // JSON [{entryId,title}] of where they came up
+  weight    Int      @default(1)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@index([weight])
+}
+
 // Provenance for ingested knowledge — every entry created from an external
 // source (a file, a web page, a GitHub repo) records where it came from, so the
 // same item is never ingested twice and "show original" stays possible.

@@ -16,6 +16,7 @@ const discover = [
   { href: "/money", label: "Money Review", icon: "💰" },
   { href: "/learn", label: "Test Me", icon: "🎯" },
   { href: "/graph", label: "Knowledge Graph", icon: "🕸️" },
+  { href: "/people", label: "People", icon: "👥" },
   { href: "/timeline", label: "Life Timeline", icon: "🧭" },
   { href: "/patterns", label: "Patterns", icon: "📊" },
   { href: "/reflect", label: "Reflections", icon: "🔮" },

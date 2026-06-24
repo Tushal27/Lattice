@@ -110,6 +110,17 @@ const STATEMENTS = [
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
   )`,
   `CREATE INDEX IF NOT EXISTS "Memory_kind_idx" ON "Memory"("kind")`,
+  `CREATE TABLE IF NOT EXISTS "Person" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "aka" TEXT,
+    "summary" TEXT,
+    "mentions" TEXT,
+    "weight" INTEGER NOT NULL DEFAULT 1,
+    "updatedAt" DATETIME NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  `CREATE INDEX IF NOT EXISTS "Person_weight_idx" ON "Person"("weight")`,
   `CREATE TABLE IF NOT EXISTS "Source" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "provider" TEXT NOT NULL,

@@ -97,6 +97,7 @@ export function CommandPalette() {
     { id: "nav-home", label: "Dashboard", icon: "◇", run: () => go("/"), keywords: "home" },
     { id: "nav-learn", label: "Test Me", icon: "🎯", run: () => go("/learn"), keywords: "recall quiz flashcards learn study" },
     { id: "nav-graph", label: "Knowledge Graph", icon: "🕸️", run: () => go("/graph"), keywords: "network connections lattice" },
+    { id: "nav-people", label: "People", icon: "👥", run: () => go("/people"), keywords: "crm contacts relationships who" },
     { id: "nav-review", label: "Daily Review", icon: "☀️", run: () => go("/review"), keywords: "resurface on this day" },
     { id: "nav-commitments", label: "Commitments", icon: "🎯", run: () => go("/commitments"), keywords: "reminders tasks follow through habits due" },
     { id: "nav-money", label: "Money Review", icon: "💰", run: () => go("/money"), keywords: "finance spending expenses roi budget investment worth it" },

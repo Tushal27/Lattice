@@ -524,6 +524,60 @@ export async function researchQuestion(title: string, summary = ""): Promise<str
   return generate(prompt, { system: WONDER_SYSTEM, temperature: 0.6 });
 }
 
+export interface ExtractedPerson {
+  entryId: string;
+  name: string;
+  context: string;
+}
+
+/**
+ * Pull the real people (not the user) mentioned across a batch of entries, each
+ * with a short note on who they are / the relationship — for CRM-lite.
+ */
+export async function extractPeople(
+  entries: { id: string; type: string; title: string; summary: string | null; fields: string | null }[],
+): Promise<ExtractedPerson[]> {
+  if (entries.length === 0) return [];
+  const blocks = entries
+    .map((e) => {
+      const f = parseFields(e.fields);
+      const extra = Object.values(f).join(" ").slice(0, 400);
+      return `id ${e.id}: [${e.type}] ${e.title}${e.summary ? ` — ${e.summary}` : ""} ${extra}`.trim();
+    })
+    .join("\n");
+
+  const prompt = [
+    "From my notes below, extract the real PEOPLE mentioned (not me, not companies/tools). For each, give their name and a short note on who they are or my relationship/context with them.",
+    "Skip generic roles with no name. Be conservative — only clear, named people.",
+    "",
+    blocks,
+    "",
+    'Respond with ONLY a JSON array: [{"id":"<the entry id it came from>","name":"Full Name","context":"who they are / what about them"}]. Empty array if none.',
+  ].join("\n");
+
+  const ai = await generate(prompt, { temperature: 0.2 });
+  if (!ai) return [];
+  const cleaned = ai.replace(/```json/gi, "").replace(/```/g, "").trim();
+  const start = cleaned.indexOf("[");
+  const end = cleaned.lastIndexOf("]");
+  if (start === -1 || end === -1) return [];
+  try {
+    const arr = JSON.parse(jsonrepair(cleaned.slice(start, end + 1)));
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .map((r): ExtractedPerson | null => {
+        if (!r || typeof r !== "object") return null;
+        const o = r as Record<string, unknown>;
+        const name = String(o.name ?? "").trim();
+        if (!name || name.length > 80) return null;
+        return { entryId: String(o.id ?? ""), name, context: String(o.context ?? "").slice(0, 280) };
+      })
+      .filter((x): x is ExtractedPerson => x !== null);
+  } catch {
+    return [];
+  }
+}
+
 export async function connectionInsight(entryId: string) {
   const entry = await getEntry(entryId);
   if (!entry) return { source: "local" as const, text: "Entry not found.", suggestions: [] };

@@ -75,6 +75,13 @@ export const CAPABILITIES: CapabilitySpec[] = [
     defaultTrust: "auto",
     outward: false,
   },
+  {
+    key: "autonomy.people",
+    label: "Build my people index",
+    description: "Quietly track the people I mention so it can recall my history with them before a meeting or email.",
+    defaultTrust: "auto",
+    outward: false,
+  },
 ];
 
 const PERM_PREFIX = "perm:";
