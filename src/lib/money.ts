@@ -196,6 +196,18 @@ export async function moneyAnalytics(period: MoneyPeriod = "month") {
     best,
     worst,
     byCategory,
+    // Every individual spend in the period, newest first — for the full list view.
+    allSpends: [...expInPeriod]
+      .sort((a, b) => b.when.getTime() - a.when.getTime())
+      .map((e) => ({
+        id: e.id,
+        title: e.title,
+        amount: e.amount,
+        category: e.category,
+        score: e.score,
+        when: e.when,
+        recurring: e.recurring,
+      })),
     investments: { count: investActive.length, total: investedTotal },
     goals,
     awaitingReview,

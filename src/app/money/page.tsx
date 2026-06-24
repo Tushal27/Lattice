@@ -133,6 +133,42 @@ export default async function MoneyPage(props: PageProps<"/money">) {
             </Card>
           )}
 
+          {/* Every spend — the full itemized list, not just sums */}
+          {a.allSpends.length > 0 && (
+            <Card>
+              <div className="mb-4 flex items-baseline justify-between">
+                <h2 className="section-label">All spends</h2>
+                <span className="text-xs text-zinc-500">{a.allSpends.length} · {formatMoney(a.spend.total)}</span>
+              </div>
+              <div className="divide-y divide-white/5">
+                {a.allSpends.map((s) => {
+                  const v = valueTag(s.score);
+                  return (
+                    <Link
+                      key={s.id}
+                      href={`/entry/${s.id}`}
+                      className="flex items-center gap-3 py-2.5 text-sm transition-colors hover:bg-white/[0.02]"
+                    >
+                      <span className="w-12 shrink-0 text-xs text-zinc-500">
+                        {s.when.toLocaleDateString(undefined, { day: "numeric", month: "short" })}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-zinc-100">
+                        {s.title}
+                        {s.category && s.category !== "Uncategorized" && (
+                          <span className="ml-2 rounded-full bg-white/5 px-1.5 py-0.5 text-[10px] text-zinc-500">{s.category}</span>
+                        )}
+                      </span>
+                      <span className="tabnums shrink-0 text-zinc-300">{formatMoney(s.amount)}</span>
+                      <span className={cn("w-14 shrink-0 text-right text-xs", v?.cls ?? "text-zinc-700")}>
+                        {v?.text ?? "—"}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+
           {/* Goals — with one-tap contributions */}
           {goals.length > 0 && <MoneyGoals goals={goals} />}
         </>
