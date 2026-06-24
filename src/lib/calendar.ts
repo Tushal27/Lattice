@@ -94,3 +94,87 @@ export async function createEvent(ev: NewEvent): Promise<{ id: string; htmlLink?
   const data = (await res.json()) as { id: string; htmlLink?: string };
   return { id: data.id, htmlLink: data.htmlLink };
 }
+
+/** Move an event to a new start (keeps duration unless an end is given). */
+export async function updateEvent(id: string, start: Date, end?: Date): Promise<boolean> {
+  const token = await accessToken();
+  if (!token) return false;
+  const finalEnd = end ?? new Date(start.getTime() + 30 * 60000);
+  const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ start: { dateTime: start.toISOString() }, end: { dateTime: finalEnd.toISOString() } }),
+  });
+  return res.ok;
+}
+
+export async function deleteEvent(id: string): Promise<boolean> {
+  const token = await accessToken();
+  if (!token) return false;
+  const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.ok || res.status === 410; // 410 = already gone
+}
+
+export interface FreeSlot {
+  start: string;
+  end: string;
+}
+
+/**
+ * Find open slots of at least `durationMin` over the next `withinDays`, within
+ * working hours (local). Computed by subtracting busy events from each day's
+ * window. `tz` is minutes east of UTC.
+ */
+export async function findFreeSlots(opts: {
+  durationMin?: number;
+  withinDays?: number;
+  dayStart?: number;
+  dayEnd?: number;
+  tz?: number;
+}): Promise<FreeSlot[]> {
+  const token = await accessToken();
+  if (!token) return [];
+  const durationMin = opts.durationMin ?? 30;
+  const withinDays = Math.min(opts.withinDays ?? 5, 14);
+  const dayStart = opts.dayStart ?? 9;
+  const dayEnd = opts.dayEnd ?? 18;
+  const tz = opts.tz ?? 0;
+  const durMs = durationMin * 60000;
+
+  const events = await upcomingEvents({ days: withinDays + 1, max: 80 });
+  const busy = events
+    .filter((e) => !e.allDay && e.start && e.end)
+    .map((e) => ({ s: new Date(e.start).getTime(), e: new Date(e.end).getTime() }))
+    .sort((a, b) => a.s - b.s);
+
+  // The instant for day-offset `d` at local hour `h`.
+  const localInstant = (d: number, h: number) => {
+    const base = new Date(Date.now() + tz * 60000);
+    base.setUTCDate(base.getUTCDate() + d);
+    base.setUTCHours(h, 0, 0, 0);
+    return base.getTime() - tz * 60000;
+  };
+
+  const slots: FreeSlot[] = [];
+  const now = Date.now();
+  for (let d = 0; d <= withinDays && slots.length < 8; d++) {
+    const windowStart = Math.max(now, localInstant(d, dayStart));
+    const windowEnd = localInstant(d, dayEnd);
+    if (windowEnd <= windowStart) continue;
+    let cursor = windowStart;
+    for (const b of busy) {
+      if (b.e <= cursor || b.s >= windowEnd) continue;
+      if (b.s - cursor >= durMs) slots.push({ start: new Date(cursor).toISOString(), end: new Date(cursor + durMs).toISOString() });
+      cursor = Math.max(cursor, b.e);
+      if (cursor >= windowEnd) break;
+      if (slots.length >= 8) break;
+    }
+    if (windowEnd - cursor >= durMs && slots.length < 8) {
+      slots.push({ start: new Date(cursor).toISOString(), end: new Date(cursor + durMs).toISOString() });
+    }
+  }
+  return slots;
+}

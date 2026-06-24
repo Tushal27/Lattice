@@ -19,6 +19,8 @@ const SCOPES = [
   // events scope covers reading and writing the user's calendar events.
   "https://www.googleapis.com/auth/calendar.events",
   "https://www.googleapis.com/auth/calendar.readonly",
+  // read-only contacts: resolve "email John" to John's address + enrich people.
+  "https://www.googleapis.com/auth/contacts.readonly",
 ];
 
 export function googleEnabled(): boolean {

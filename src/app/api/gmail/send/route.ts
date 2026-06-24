@@ -1,14 +1,20 @@
 import { getTrust, logAction } from "@/lib/capabilities";
+import { resolveContactEmail } from "@/lib/contacts";
 import { gmailConnected, sendEmail } from "@/lib/gmail";
 
 // Send an email the user has reviewed. Gated by the gmail.send_email capability
 // (off = blocked) and a live Google connection; every send is audited.
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as { to?: string; subject?: string; body?: string; cc?: string };
-  const to = String(body.to ?? "").trim();
+  let to = String(body.to ?? "").trim();
   const subject = String(body.subject ?? "").trim();
   const text = String(body.body ?? "");
 
+  // Allow a name as recipient — resolve it from Google Contacts.
+  if (to && !to.includes("@")) {
+    const resolved = await resolveContactEmail(to).catch(() => null);
+    if (resolved) to = resolved;
+  }
   if (!to || !/.+@.+\..+/.test(to)) return Response.json({ error: "A valid recipient is required." }, { status: 400 });
   if (!text.trim()) return Response.json({ error: "The email body is empty." }, { status: 400 });
 

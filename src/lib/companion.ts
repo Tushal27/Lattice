@@ -432,11 +432,13 @@ export async function extractFromEmails(
 
 export interface EmailTriage {
   messageId: string;
-  kind: "commitment" | "reply" | "renewal" | "skip";
+  kind: "commitment" | "reply" | "renewal" | "spend" | "skip";
   title: string;
   summary: string;
   due: string; // for commitments
   draft: string; // a full draft reply, for kind === "reply"
+  amount: number; // for spend: the amount charged
+  category: string; // for spend: a best-guess category
 }
 
 /**
@@ -460,18 +462,19 @@ export async function triageEmails(
     "Triage each email below into exactly one kind:",
     "- commitment: it implies a concrete task/deadline I personally must do.",
     "- reply: a real person is waiting for my response. Write a complete, polite, ready-to-send draft reply in my voice (greeting + body + sign-off). Do NOT invent facts I haven't given — keep it reasonable and brief.",
-    "- renewal: a subscription, bill, or payment about to charge/renew (note the service and amount/date if present).",
+    "- renewal: a subscription/bill ABOUT TO charge or renew (a heads-up, not a completed payment).",
+    "- spend: a COMPLETED transaction/payment/debit notification (bank, UPI, GPay, card, receipt) — money already left my account. Extract the amount (number only) and a best-guess category (Essentials, Food, Health, Learning, Tools/Software, Family, Experiences, Lifestyle, Transport, Other).",
     "- skip: newsletters, marketing, notifications, FYI-only, automated noise.",
     "Be conservative; most promotional mail is skip.",
     "",
     blocks,
     "",
     'Respond with ONLY a JSON array, one object per email:',
-    '{"id":"<email id>","kind":"commitment|reply|renewal|skip","title":"short label","summary":"one line of context","due":"natural-language deadline if a commitment, else empty","draft":"the full reply text if kind is reply, else empty"}',
+    '{"id":"<email id>","kind":"commitment|reply|renewal|spend|skip","title":"short label (for spend: the merchant/payee)","summary":"one line of context","due":"natural-language deadline if a commitment, else empty","draft":"the full reply text if kind is reply, else empty","amount":<number for spend, else 0>,"category":"category for spend, else empty"}',
   ].join("\n");
 
   const ai = await generate(prompt, { system: THINKING_PARTNER_SYSTEM, temperature: 0.3 });
-  if (!ai) return messages.map((m) => ({ messageId: m.id, kind: "skip" as const, title: "", summary: "", due: "", draft: "" }));
+  if (!ai) return messages.map((m) => ({ messageId: m.id, kind: "skip" as const, title: "", summary: "", due: "", draft: "", amount: 0, category: "" }));
 
   const cleaned = ai.replace(/```json/gi, "").replace(/```/g, "").trim();
   const start = cleaned.indexOf("[");
@@ -485,7 +488,7 @@ export async function triageEmails(
   }
   if (!Array.isArray(arr)) return [];
 
-  const valid = new Set(["commitment", "reply", "renewal", "skip"]);
+  const valid = new Set(["commitment", "reply", "renewal", "spend", "skip"]);
   return arr
     .map((row): EmailTriage | null => {
       if (!row || typeof row !== "object") return null;
@@ -493,6 +496,7 @@ export async function triageEmails(
       const id = String(r.id ?? "");
       if (!id) return null;
       const kind = valid.has(String(r.kind)) ? (String(r.kind) as EmailTriage["kind"]) : "skip";
+      const amount = Number(r.amount);
       return {
         messageId: id,
         kind,
@@ -500,6 +504,8 @@ export async function triageEmails(
         summary: String(r.summary ?? "").slice(0, 280),
         due: String(r.due ?? "").slice(0, 80),
         draft: String(r.draft ?? "").slice(0, 4000),
+        amount: Number.isFinite(amount) ? amount : 0,
+        category: String(r.category ?? "").slice(0, 40),
       };
     })
     .filter((x): x is EmailTriage => x !== null);

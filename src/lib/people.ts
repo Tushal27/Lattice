@@ -1,4 +1,5 @@
 import { extractPeople } from "@/lib/companion";
+import { resolveContactEmail } from "@/lib/contacts";
 import { prisma } from "@/lib/db";
 
 // CRM-lite: a people index auto-derived from the user's entries. Each person
@@ -70,8 +71,9 @@ async function mergePerson(name: string, context: string, mention: Mention) {
       data: { summary, mentions: JSON.stringify(mentions.slice(0, 15)), weight: { increment: 1 } },
     });
   } else {
+    const aka = await resolveContactEmail(name).catch(() => null);
     await prisma.person.create({
-      data: { name: name.trim(), summary: context || null, mentions: JSON.stringify([mention]) },
+      data: { name: name.trim(), aka, summary: context || null, mentions: JSON.stringify([mention]) },
     });
   }
 }
