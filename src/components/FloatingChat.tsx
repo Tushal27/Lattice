@@ -61,12 +61,13 @@ const SUGGESTIONS: Record<Mode, string[]> = {
   ],
 };
 
-const WRITE_TOOLS = new Set(["create_entry", "update_entry", "connect_entries", "create_commitment"]);
+const WRITE_TOOLS = new Set(["create_entry", "update_entry", "connect_entries", "create_commitment", "create_calendar_event"]);
 const VERB: Record<string, string> = {
   create_entry: "Created",
   update_entry: "Updated",
   connect_entries: "Linked",
   create_commitment: "Committed",
+  create_calendar_event: "Scheduled",
 };
 
 export function FloatingChat() {
@@ -1047,7 +1048,8 @@ function IconButton({
 
 function ActionCard({ step, onNavigate }: { step: Step; onNavigate: () => void }) {
   const isCommitment = step.tool === "create_commitment";
-  const icon = isCommitment ? "🎯" : step.entryType ? TYPES[step.entryType as EntryType]?.icon : "🔗";
+  const isCalendar = step.tool === "create_calendar_event";
+  const icon = isCalendar ? "📅" : isCommitment ? "🎯" : step.entryType ? TYPES[step.entryType as EntryType]?.icon : "🔗";
   const verb = VERB[step.tool] ?? "Did";
   const label = step.ok ? verb : "Couldn't " + verb.toLowerCase();
   const body = (

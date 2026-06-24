@@ -69,6 +69,10 @@ interface ParsedAgent {
 }
 
 const WRITE_TOOLS = new Set(["create_entry", "update_entry", "connect_entries", "create_commitment"]);
+// Tools that count as "the assistant did something for you". Includes calendar
+// events — which aren't local writes but ARE real actions, so the capture
+// safety-net must not treat a successful calendar event as "nothing happened".
+const ACTION_TOOLS = new Set([...WRITE_TOOLS, "create_calendar_event"]);
 
 export async function runAgent(
   message: string,
@@ -127,11 +131,11 @@ export async function runAgent(
       }
       const step = await execute(action, { preserveRaw: opts.preserveRaw, rawText: message, tz: opts.tz });
       steps.push(step);
-      if (step.ok && WRITE_TOOLS.has(action.tool)) {
+      if (step.ok && ACTION_TOOLS.has(action.tool)) {
         didWrite = true;
         if (action.tool === "create_entry" && step.entryTitle) createdTitles.add(step.entryTitle.toLowerCase());
       }
-      if (step.ok && !WRITE_TOOLS.has(action.tool) && step.summary) {
+      if (step.ok && !ACTION_TOOLS.has(action.tool) && step.summary) {
         readResults.push(step.summary);
       }
     }
@@ -143,7 +147,7 @@ export async function runAgent(
       // Capture-intent guard: models sometimes reply "Captured…" while emitting
       // no create action, so nothing is actually saved. Force one corrective
       // step before giving up.
-      const wroteAnything = steps.some((s) => s.ok && WRITE_TOOLS.has(s.tool));
+      const wroteAnything = steps.some((s) => s.ok && ACTION_TOOLS.has(s.tool));
       if (opts.preserveRaw && !wroteAnything && !forcedCapture && claimsCapture(reply)) {
         forcedCapture = true;
         readResults.push(
@@ -159,7 +163,7 @@ export async function runAgent(
   // something but still emitted no write, create the entry ourselves so the
   // user's input is never silently lost. Classification falls back to a local
   // heuristic when the AI is unavailable.
-  if (opts.preserveRaw && claimsCapture(reply) && !steps.some((s) => s.ok && WRITE_TOOLS.has(s.tool))) {
+  if (opts.preserveRaw && claimsCapture(reply) && !steps.some((s) => s.ok && ACTION_TOOLS.has(s.tool))) {
     try {
       const c = await classifyThought(message);
       const type = isEntryType(c.type) ? c.type : "lesson";
@@ -572,7 +576,8 @@ const AGENT_SYSTEM = [
   "- REVIEWING A DECISION: when the user grades how a past decision turned out (e.g. \"review my X decision\", \"that call worked out\", \"it was the wrong move\"), first search_entries to find its id, then update_entry with the review-only fields: reviewOutcome (what actually happened), reviewVerdict (Right call|Mixed|Wrong call|Too early to tell), wouldRepeat (Yes|No|Not sure), reviewLearning. Don't change the original decision text.",
   "- CAPTURE MODE IS FOR SAVING. Any time the user states a thought, insight, decision, lesson, realization, observation, fact, or even a bare question, you MUST emit create_entry — DO NOT just reply. Usually ONE entry; BUT if the user clearly lists several DISTINCT items (labeled sections like 'Goal:' / 'Investments:', or a list of separate things), create ONE entry per item, each with its own best-fit type. A question the user shares is captured as a `question` entry, not answered. Then set done=true. CRITICAL: if your reply claims you captured N things, you must have emitted N matching create actions — never claim more than you created.",
   "- NEVER reply that you captured, saved, filed, noted, created, or recorded something unless you actually emitted the matching create_entry/create_commitment action in the SAME response. No empty 'actions' with a 'Captured…' reply.",
-  '- COMMITMENTS / REMINDERS: when the user wants to do something later, set a reminder, schedule a follow-up, or commit to a habit ("remind me to…", "I need to … by Friday", "every morning I want to…", "follow up on X next week"), use create_commitment with the natural-language due date. Don\'t also create an entry for a pure reminder. Set done=true.',
+  '- CALENDAR: if the user explicitly mentions their CALENDAR, or asks to schedule/book an event, appointment, meeting, or time-block ("put X on my calendar", "set a calendar reminder for …", "schedule …", "book …", "block 2pm for …"), use create_calendar_event — NOT create_entry, and NOT create_commitment. Never capture a scheduling/calendar request as a plain entry. If calendar isn\'t available the tool will say so; in that case fall back to create_commitment so the intent is still saved. Set done=true.',
+  '- COMMITMENTS / REMINDERS: when the user wants to do something later, set a reminder, schedule a follow-up, or commit to a habit ("remind me to…", "I need to … by Friday", "every morning I want to…", "follow up on X next week") WITHOUT mentioning their calendar, use create_commitment with the natural-language due date. Don\'t also create an entry for a pure reminder. Set done=true.',
   '- LIST OF TASKS: if the user gives several things to do / a to-do or task list (numbered or bulleted, e.g. "tasks for the next 10 days: 1… 2… 3…"), emit ONE create_commitment per item in the SAME response (spread the due dates across the stated window if implied). Never reply that you "set commitments/reminders" without actually emitting those create_commitment actions.',
   "- Only connect_entries when the user explicitly asks to link things, and only with real ids from the context or a search result. NEVER invent ids or use a title as an id. If you don't have a real id, don't connect.",
   "- Do each write at most once. After your write actions, set done=true and give a short, friendly reply describing what you saved.",
