@@ -90,6 +90,52 @@ export async function fetchRecentMessages(opts: { days?: number; max?: number } 
   return out;
 }
 
+// MIME-encode a header value if it has non-ASCII (so subjects with emoji/accents
+// don't corrupt the headers).
+function encodeHeader(v: string): string {
+  if (/^[ -~]*$/.test(v)) return v; // all printable ASCII → safe as-is
+  return `=?UTF-8?B?${Buffer.from(v, "utf8").toString("base64")}?=`;
+}
+
+export interface OutgoingEmail {
+  to: string;
+  subject: string;
+  body: string;
+  cc?: string;
+}
+
+/** Send an email as the connected user. Returns true on success. */
+export async function sendEmail(mail: OutgoingEmail): Promise<{ ok: boolean; error?: string }> {
+  const token = await accessToken();
+  if (!token) return { ok: false, error: "Not connected to Google." };
+
+  const headers = [
+    `To: ${mail.to}`,
+    mail.cc ? `Cc: ${mail.cc}` : "",
+    `Subject: ${encodeHeader(mail.subject)}`,
+    "MIME-Version: 1.0",
+    "Content-Type: text/plain; charset=UTF-8",
+    "",
+    mail.body,
+  ]
+    .filter((l) => l !== "")
+    .join("\r\n");
+
+  const raw = Buffer.from(headers, "utf8").toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+  const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ raw }),
+  });
+  if (!res.ok) {
+    await res.text().catch(() => "");
+    // 403 here usually means the gmail.send scope wasn't granted — reconnect.
+    return { ok: false, error: res.status === 403 ? "Reconnect Google to grant send access." : `Send failed (${res.status}).` };
+  }
+  return { ok: true };
+}
+
 /** Mark message ids as processed so future syncs don't re-handle them. */
 export async function markSeen(ids: string[]): Promise<void> {
   if (ids.length === 0) return;

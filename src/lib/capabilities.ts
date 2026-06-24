@@ -41,6 +41,13 @@ export const CAPABILITIES: CapabilitySpec[] = [
     outward: true,
   },
   {
+    key: "gmail.send_email",
+    label: "Send email",
+    description: "Let the assistant draft and send email on your behalf. You always confirm before anything is sent.",
+    defaultTrust: "ask",
+    outward: true,
+  },
+  {
     key: "autonomy.schedule_reviews",
     label: "Auto-schedule decision reviews",
     description: "When a decision is old enough to judge, put a review block on your calendar automatically.",

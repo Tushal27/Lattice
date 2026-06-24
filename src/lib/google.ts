@@ -14,6 +14,8 @@ const SCOPES = [
   "openid",
   "email",
   "https://www.googleapis.com/auth/gmail.readonly",
+  // send-only: lets Lattice send mail you compose, but not read/modify beyond that.
+  "https://www.googleapis.com/auth/gmail.send",
   // events scope covers reading and writing the user's calendar events.
   "https://www.googleapis.com/auth/calendar.events",
   "https://www.googleapis.com/auth/calendar.readonly",

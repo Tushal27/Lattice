@@ -37,6 +37,7 @@ export interface ExecutedStep {
   entryId?: string;
   entryType?: string;
   entryTitle?: string;
+  draft?: EmailDraft;
 }
 
 export interface SuggestedCommitment {
@@ -44,6 +45,12 @@ export interface SuggestedCommitment {
   due: string;
   sourceType: string;
   sourceId: string;
+}
+
+export interface EmailDraft {
+  to: string;
+  subject: string;
+  body: string;
 }
 
 export interface AgentResult {
@@ -55,6 +62,8 @@ export interface AgentResult {
   mutated: boolean;
   /** A follow-through the user can confirm (not auto-saved). */
   suggestion?: SuggestedCommitment;
+  /** A composed email for the user to review and send (never auto-sent). */
+  emailDraft?: EmailDraft;
 }
 
 export interface AgentTurn {
@@ -72,7 +81,7 @@ const WRITE_TOOLS = new Set(["create_entry", "update_entry", "connect_entries", 
 // Tools that count as "the assistant did something for you". Includes calendar
 // events — which aren't local writes but ARE real actions, so the capture
 // safety-net must not treat a successful calendar event as "nothing happened".
-const ACTION_TOOLS = new Set([...WRITE_TOOLS, "create_calendar_event"]);
+const ACTION_TOOLS = new Set([...WRITE_TOOLS, "create_calendar_event", "send_email"]);
 
 export async function runAgent(
   message: string,
@@ -228,6 +237,8 @@ export async function runAgent(
     }
   }
 
+  const emailDraft = steps.find((s) => s.tool === "send_email" && s.ok && s.draft)?.draft;
+
   return {
     reply: reply || "Done.",
     steps,
@@ -235,6 +246,7 @@ export async function runAgent(
     provider,
     mutated: steps.some((s) => s.ok && WRITE_TOOLS.has(s.tool)),
     suggestion,
+    emailDraft,
   };
 }
 
@@ -263,6 +275,8 @@ async function execute(
         return await commitmentTool(a, opts);
       case "create_calendar_event":
         return await calendarTool(a, opts);
+      case "send_email":
+        return await emailTool(a);
       case "search_entries":
         return await searchTool(a);
       case "get_entry":
@@ -434,6 +448,24 @@ async function calendarTool(args: Record<string, unknown>, opts: ExecOpts = {}):
   return { tool: "create_calendar_event", ok: true, summary: `Added to your calendar: ${title} · ${whenLabel}` };
 }
 
+// Outward action: compose an email. It NEVER sends here — it returns a draft the
+// user reviews and sends from the chat. Gated by the gmail.send_email capability.
+async function emailTool(args: Record<string, unknown>): Promise<ExecutedStep> {
+  if ((await getTrust("gmail.send_email")) === "off") {
+    return { tool: "send_email", ok: false, summary: "Sending email is turned off in Settings." };
+  }
+  const to = String(args.to ?? args.recipient ?? "").trim();
+  const subject = String(args.subject ?? "").trim();
+  const body = String(args.body ?? args.message ?? "").trim();
+  if (!body) return { tool: "send_email", ok: false, summary: "I need the message to draft an email." };
+  return {
+    tool: "send_email",
+    ok: true,
+    summary: to ? `Drafted an email to ${to}` : "Drafted an email — add the recipient",
+    draft: { to, subject, body },
+  };
+}
+
 async function searchTool(args: Record<string, unknown>): Promise<ExecutedStep> {
   const query = String(args.query ?? "");
   const results = await searchEntries(query);
@@ -555,6 +587,7 @@ const AGENT_SYSTEM = [
   "- connect_entries{fromId, toId, note?} — link two related entries.",
   '- create_commitment{title, due?, recurring?, priority?, note?} — set a follow-through/reminder. `due` is natural language ("tomorrow at 9", "next monday", "in 3 days", "2026-07-01"); `recurring` is daily|weekly|monthly; priority is low|medium|high.',
   '- create_calendar_event{summary, start, durationMinutes?, location?, note?} — put a real event/time-block on the user\'s Google Calendar. `start` is natural language (same as `due`). Use this when the user wants something on their CALENDAR or a scheduled time-block (a meeting, an appointment, "block 2pm tomorrow to…"), as opposed to a plain reminder (use create_commitment for those). The system enforces the user\'s permission for this — just emit it when appropriate.',
+  '- send_email{to, subject, body} — compose an email. This does NOT send — it shows the user a draft to review and send themselves, so always write the FULL, well-composed message body (proper greeting and sign-off), not a placeholder. `to` is the recipient\'s email address if the user gave one; if you don\'t have it, still draft and leave `to` empty for them to fill. Use this whenever the user wants to email/message someone or write/send a mail.',
   "- search_entries{query} — find entries (use before update/connect to get real ids).",
   "- get_entry{id} — read one entry's full details.",
   "- list_projects{} / list_recent{limit?} — browse.",
@@ -576,6 +609,7 @@ const AGENT_SYSTEM = [
   "- REVIEWING A DECISION: when the user grades how a past decision turned out (e.g. \"review my X decision\", \"that call worked out\", \"it was the wrong move\"), first search_entries to find its id, then update_entry with the review-only fields: reviewOutcome (what actually happened), reviewVerdict (Right call|Mixed|Wrong call|Too early to tell), wouldRepeat (Yes|No|Not sure), reviewLearning. Don't change the original decision text.",
   "- CAPTURE MODE IS FOR SAVING. Any time the user states a thought, insight, decision, lesson, realization, observation, fact, or even a bare question, you MUST emit create_entry — DO NOT just reply. Usually ONE entry; BUT if the user clearly lists several DISTINCT items (labeled sections like 'Goal:' / 'Investments:', or a list of separate things), create ONE entry per item, each with its own best-fit type. A question the user shares is captured as a `question` entry, not answered. Then set done=true. CRITICAL: if your reply claims you captured N things, you must have emitted N matching create actions — never claim more than you created.",
   "- NEVER reply that you captured, saved, filed, noted, created, or recorded something unless you actually emitted the matching create_entry/create_commitment action in the SAME response. No empty 'actions' with a 'Captured…' reply.",
+  '- EMAIL: when the user wants to send/write an email or message someone ("email Alice that…", "send a mail to x@y.com saying…", "draft a reply to…"), use send_email and compose the complete message. It is shown for the user to confirm — you never actually send it, so write it as if it\'s going out. Set done=true.',
   '- CALENDAR: if the user explicitly mentions their CALENDAR, or asks to schedule/book an event, appointment, meeting, or time-block ("put X on my calendar", "set a calendar reminder for …", "schedule …", "book …", "block 2pm for …"), use create_calendar_event — NOT create_entry, and NOT create_commitment. Never capture a scheduling/calendar request as a plain entry. If calendar isn\'t available the tool will say so; in that case fall back to create_commitment so the intent is still saved. Set done=true.',
   '- COMMITMENTS / REMINDERS: when the user wants to do something later, set a reminder, schedule a follow-up, or commit to a habit ("remind me to…", "I need to … by Friday", "every morning I want to…", "follow up on X next week") WITHOUT mentioning their calendar, use create_commitment with the natural-language due date. Don\'t also create an entry for a pure reminder. Set done=true.',
   '- LIST OF TASKS: if the user gives several things to do / a to-do or task list (numbered or bulleted, e.g. "tasks for the next 10 days: 1… 2… 3…"), emit ONE create_commitment per item in the SAME response (spread the due dates across the stated window if implied). Never reply that you "set commitments/reminders" without actually emitting those create_commitment actions.',

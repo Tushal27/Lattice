@@ -36,6 +36,12 @@ interface Suggestion {
   sourceId: string;
 }
 
+interface EmailDraft {
+  to: string;
+  subject: string;
+  body: string;
+}
+
 interface Msg {
   role: "you" | "ai";
   text: string;
@@ -46,6 +52,7 @@ interface Msg {
   saved?: boolean;
   images?: string[];
   suggestion?: Suggestion;
+  emailDraft?: EmailDraft;
 }
 
 const SUGGESTIONS: Record<Mode, string[]> = {
@@ -321,6 +328,7 @@ export function FloatingChat() {
             provider: data.provider,
             steps: data.steps,
             suggestion: data.suggestion,
+            emailDraft: data.emailDraft,
           },
         ]);
         if (data.mutated) router.refresh();
@@ -703,6 +711,8 @@ export function FloatingChat() {
 
                         {m.suggestion && <SuggestionCard suggestion={m.suggestion} onAdded={() => router.refresh()} />}
 
+                        {m.emailDraft && <EmailDraftCard draft={m.emailDraft} />}
+
                         {m.source === "ai" && (
                           <MessageActions
                             text={m.text}
@@ -931,6 +941,72 @@ function SuggestionCard({ suggestion, onAdded }: { suggestion: Suggestion; onAdd
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function EmailDraftCard({ draft }: { draft: EmailDraft }) {
+  const [to, setTo] = useState(draft.to);
+  const [subject, setSubject] = useState(draft.subject);
+  const [body, setBody] = useState(draft.body);
+  const [state, setState] = useState<"idle" | "sending" | "sent" | "dismissed">("idle");
+  const [error, setError] = useState("");
+
+  if (state === "dismissed") return null;
+
+  async function sendIt() {
+    if (!to.trim() || !body.trim() || state === "sending") return;
+    setState("sending");
+    setError("");
+    try {
+      const res = await fetch("/api/gmail/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: to.trim(), subject, body }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error ?? "Send failed");
+      setState("sent");
+    } catch (e) {
+      setError((e as Error).message);
+      setState("idle");
+    }
+  }
+
+  if (state === "sent") {
+    return (
+      <div className="mt-3 rounded-xl border border-emerald-400/25 bg-emerald-500/5 p-3 text-sm text-emerald-300">
+        ✓ Sent to {to}
+      </div>
+    );
+  }
+
+  const field = "w-full rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-violet-400/40 focus:outline-none";
+
+  return (
+    <div className="mt-3 rounded-xl border border-sky-400/25 bg-sky-500/5 p-3">
+      <div className="mb-2 flex items-center gap-2 text-[11px] font-medium text-sky-300">📧 Draft email · review &amp; send</div>
+      <div className="space-y-2">
+        <input value={to} onChange={(e) => setTo(e.target.value)} placeholder="recipient@email.com" className={field} />
+        <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject" className={field} />
+        <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={6} className={`${field} resize-y leading-relaxed`} />
+      </div>
+      {error && <p className="mt-2 text-xs text-rose-300">{error}</p>}
+      <div className="mt-2 flex gap-2">
+        <button
+          onClick={sendIt}
+          disabled={state === "sending" || !to.trim() || !body.trim()}
+          className="press rounded-lg bg-sky-600/90 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-600 disabled:opacity-50"
+        >
+          {state === "sending" ? "Sending…" : "Send"}
+        </button>
+        <button
+          onClick={() => setState("dismissed")}
+          className="press rounded-lg px-3 py-1.5 text-xs text-zinc-400 hover:bg-white/10 hover:text-zinc-200"
+        >
+          Discard
+        </button>
       </div>
     </div>
   );
