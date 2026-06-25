@@ -53,7 +53,9 @@ export async function getContacts(force = false): Promise<Contact[]> {
     }
   }
   const list = await fetchContacts();
-  await writeState(CACHE_KEY, JSON.stringify({ at: Date.now(), list })).catch(() => {});
+  // Only cache a non-empty result, so a transient failure (e.g. the People API
+  // wasn't enabled yet) doesn't poison the cache for a day.
+  if (list.length > 0) await writeState(CACHE_KEY, JSON.stringify({ at: Date.now(), list })).catch(() => {});
   return list;
 }
 
