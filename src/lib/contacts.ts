@@ -73,3 +73,44 @@ export async function resolveContactEmail(name: string): Promise<string | null> 
     null
   );
 }
+
+/** One live People-API call that reports the HTTP status — so we can tell a
+ *  permission/API problem (403) apart from genuinely-empty saved contacts (200). */
+export async function contactsDiagnostic(): Promise<{ status: number; count: number; otherCount: number }> {
+  const token = await accessToken();
+  if (!token) return { status: 0, count: 0, otherCount: 0 };
+  const headers = { Authorization: `Bearer ${token}` };
+
+  let status = 0;
+  let count = 0;
+  try {
+    const res = await fetch(
+      "https://people.googleapis.com/v1/people/me/connections?personFields=names,emailAddresses&pageSize=50",
+      { headers, signal: AbortSignal.timeout(15000) },
+    );
+    status = res.status;
+    if (res.ok) {
+      const d = (await res.json()) as { connections?: unknown[] };
+      count = (d.connections ?? []).length;
+    }
+  } catch {
+    status = -1;
+  }
+
+  // "Other contacts" (auto-collected from your mail) — separate scope; if it
+  // works it dramatically widens who we can resolve.
+  let otherCount = 0;
+  try {
+    const res = await fetch(
+      "https://people.googleapis.com/v1/otherContacts?readMask=names,emailAddresses&pageSize=50",
+      { headers, signal: AbortSignal.timeout(15000) },
+    );
+    if (res.ok) {
+      const d = (await res.json()) as { otherContacts?: unknown[] };
+      otherCount = (d.otherContacts ?? []).length;
+    }
+  } catch {
+    /* ignore */
+  }
+  return { status, count, otherCount };
+}

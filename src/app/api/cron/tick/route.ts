@@ -1,5 +1,5 @@
 import { CAPABILITIES, getTrust } from "@/lib/capabilities";
-import { getContacts } from "@/lib/contacts";
+import { contactsDiagnostic } from "@/lib/contacts";
 import { prisma } from "@/lib/db";
 import { googleConnected, googleEnabled } from "@/lib/google";
 import { runHeartbeat } from "@/lib/heartbeat";
@@ -39,8 +39,8 @@ export async function GET(request: Request) {
     subscriptionCount().catch(() => 0),
     prisma.appState.findUnique({ where: { key: "hb:last" } }).catch(() => null),
     Promise.all(CAPABILITIES.map(async (c) => ({ key: c.key, trust: await getTrust(c.key) }))),
-    // Force a live fetch so this reflects whether People API actually returns data.
-    connected ? getContacts(true).then((l) => l.length).catch(() => -1) : 0,
+    // Live People-API probe: status tells us 403 (scope/API) vs 200 (works).
+    connected ? contactsDiagnostic().catch(() => ({ status: -1, count: 0, otherCount: 0 })) : { status: 0, count: 0, otherCount: 0 },
   ]);
 
   return Response.json({
@@ -50,7 +50,10 @@ export async function GET(request: Request) {
       pushSubscriptions: subs,
       googleConfigured: googleEnabled(),
       googleConnected: connected,
-      googleContacts: contacts, // count from a live People API call (-1 = call failed)
+      // contactsStatus: 200=works, 403=scope/API not granted, -1=call threw, 0=not connected
+      contactsStatus: contacts.status,
+      savedContacts: contacts.count,
+      otherContacts: contacts.otherCount,
       lastHeartbeat: last?.value ?? null,
       cronSecretSet: Boolean(process.env.CRON_SECRET),
       capabilities: autos,
