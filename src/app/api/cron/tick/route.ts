@@ -1,4 +1,5 @@
 import { CAPABILITIES, getTrust } from "@/lib/capabilities";
+import { getContacts } from "@/lib/contacts";
 import { prisma } from "@/lib/db";
 import { googleConnected, googleEnabled } from "@/lib/google";
 import { runHeartbeat } from "@/lib/heartbeat";
@@ -33,12 +34,13 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   if (!authed(request, url)) return new Response("Unauthorized", { status: 401 });
 
-  const [subs, last, autos] = await Promise.all([
+  const connected = googleEnabled() ? await googleConnected() : false;
+  const [subs, last, autos, contacts] = await Promise.all([
     subscriptionCount().catch(() => 0),
     prisma.appState.findUnique({ where: { key: "hb:last" } }).catch(() => null),
-    Promise.all(
-      CAPABILITIES.map(async (c) => ({ key: c.key, trust: await getTrust(c.key) })),
-    ),
+    Promise.all(CAPABILITIES.map(async (c) => ({ key: c.key, trust: await getTrust(c.key) }))),
+    // Force a live fetch so this reflects whether People API actually returns data.
+    connected ? getContacts(true).then((l) => l.length).catch(() => -1) : 0,
   ]);
 
   return Response.json({
@@ -47,7 +49,8 @@ export async function GET(request: Request) {
       pushEnabled: pushEnabled(),
       pushSubscriptions: subs,
       googleConfigured: googleEnabled(),
-      googleConnected: googleEnabled() ? await googleConnected() : false,
+      googleConnected: connected,
+      googleContacts: contacts, // count from a live People API call (-1 = call failed)
       lastHeartbeat: last?.value ?? null,
       cronSecretSet: Boolean(process.env.CRON_SECRET),
       capabilities: autos,

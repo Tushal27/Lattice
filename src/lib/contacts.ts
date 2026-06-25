@@ -46,15 +46,15 @@ export async function getContacts(force = false): Promise<Contact[]> {
     if (raw) {
       try {
         const c = JSON.parse(raw) as { at: number; list: Contact[] };
-        if (c.at && Date.now() - c.at < TTL) return c.list;
+        // Only trust a NON-empty fresh cache. An empty cache (e.g. written while
+        // the People API was disabled) is ignored so we re-fetch and self-heal.
+        if (c.at && c.list?.length > 0 && Date.now() - c.at < TTL) return c.list;
       } catch {
         /* refetch */
       }
     }
   }
   const list = await fetchContacts();
-  // Only cache a non-empty result, so a transient failure (e.g. the People API
-  // wasn't enabled yet) doesn't poison the cache for a day.
   if (list.length > 0) await writeState(CACHE_KEY, JSON.stringify({ at: Date.now(), list })).catch(() => {});
   return list;
 }
