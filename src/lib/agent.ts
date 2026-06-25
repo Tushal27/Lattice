@@ -464,11 +464,11 @@ async function emailTool(args: Record<string, unknown>): Promise<ExecutedStep> {
     return { tool: "send_email", ok: false, summary: "Sending email is turned off in Settings." };
   }
   let to = String(args.to ?? args.recipient ?? "").trim();
-  // If they named a person instead of an address, resolve it from Contacts.
+  // If they named a person, try to resolve it from Contacts; if we can't, keep
+  // the name so the draft still appears and they can fill the address in.
   if (to && !to.includes("@")) {
     const resolved = await resolveContactEmail(to).catch(() => null);
     if (resolved) to = resolved;
-    else return { tool: "send_email", ok: false, summary: `I don't have an email for "${to}" — add the address.` };
   }
   const subject = String(args.subject ?? "").trim();
   const body = String(args.body ?? args.message ?? "").trim();

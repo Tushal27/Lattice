@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PeopleSync } from "@/components/PeopleSync";
 import { EmptyState, PageHeader } from "@/components/ui";
 import { listPeople } from "@/lib/people";
 
@@ -13,7 +14,8 @@ export default async function PeoplePage() {
         icon="👥"
         accentColor="sky"
         title="People"
-        subtitle="Everyone you work with — and what your brain already knows about them. Built automatically from your notes."
+        subtitle="Everyone you work with — and what your brain already knows about them. Built from your notes (Contacts adds their emails)."
+        action={<PeopleSync empty={people.length === 0} />}
       />
 
       {people.length === 0 ? (
