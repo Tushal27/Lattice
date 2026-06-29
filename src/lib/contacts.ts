@@ -74,6 +74,13 @@ export async function resolveContactEmail(name: string): Promise<string | null> 
   );
 }
 
+/** Is this exact email address one of the user's saved contacts? */
+export async function contactHasEmail(email: string): Promise<boolean> {
+  const e = email.trim().toLowerCase();
+  if (!e) return false;
+  return (await getContacts()).some((c) => c.email.toLowerCase() === e);
+}
+
 /** One live People-API call that reports the HTTP status — so we can tell a
  *  permission/API problem (403) apart from genuinely-empty saved contacts (200). */
 export async function contactsDiagnostic(): Promise<{ status: number; count: number; otherCount: number }> {

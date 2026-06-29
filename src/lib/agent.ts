@@ -9,7 +9,7 @@
 import { aiEnabled, generateDetailed } from "@/lib/ai";
 import { calendarConnected, createEvent, deleteEvent, findFreeSlots, updateEvent, upcomingEvents } from "@/lib/calendar";
 import { getTrust, logAction } from "@/lib/capabilities";
-import { resolveContactEmail } from "@/lib/contacts";
+import { contactHasEmail, resolveContactEmail } from "@/lib/contacts";
 import { jsonrepair } from "jsonrepair";
 import { createCommitment, parseDueDate, parseRecurrence, seedRecurringDue } from "@/lib/commitments";
 import { classifyThought } from "@/lib/companion";
@@ -277,7 +277,7 @@ async function execute(
       case "create_calendar_event":
         return await calendarTool(a, opts);
       case "send_email":
-        return await emailTool(a);
+        return await emailTool(a, opts);
       case "list_events":
         return await listEventsTool(a);
       case "find_free_time":
@@ -459,24 +459,35 @@ async function calendarTool(args: Record<string, unknown>, opts: ExecOpts = {}):
 
 // Outward action: compose an email. It NEVER sends here — it returns a draft the
 // user reviews and sends from the chat. Gated by the gmail.send_email capability.
-async function emailTool(args: Record<string, unknown>): Promise<ExecutedStep> {
+async function emailTool(args: Record<string, unknown>, opts: ExecOpts = {}): Promise<ExecutedStep> {
   if ((await getTrust("gmail.send_email")) === "off") {
     return { tool: "send_email", ok: false, summary: "Sending email is turned off in Settings." };
   }
   let to = String(args.to ?? args.recipient ?? "").trim();
-  // If they named a person, try to resolve it from Contacts; if we can't, keep
-  // the name so the draft still appears and they can fill the address in.
-  if (to && !to.includes("@")) {
+  // Did the user actually type an email? If not, never trust an address the model
+  // produced — it tends to FABRICATE one (e.g. "santhosh zakapps" → santhosh@
+  // zakapps.com). Resolve names from real Contacts only.
+  const userGaveEmail = /\S+@\S+\.\S+/.test(opts.rawText ?? "");
+  if (to.includes("@")) {
+    if (!userGaveEmail && !(await contactHasEmail(to).catch(() => false))) {
+      // Fabricated address — recover the likely name and resolve it properly.
+      const namePart = to.split("@")[0].replace(/[._-]+/g, " ").trim();
+      to = (await resolveContactEmail(namePart).catch(() => null)) ?? namePart;
+    }
+  } else if (to) {
     const resolved = await resolveContactEmail(to).catch(() => null);
     if (resolved) to = resolved;
   }
+
   const subject = String(args.subject ?? "").trim();
   const body = String(args.body ?? args.message ?? "").trim();
   if (!body) return { tool: "send_email", ok: false, summary: "I need the message to draft an email." };
+
+  const resolved = to.includes("@");
   return {
     tool: "send_email",
     ok: true,
-    summary: to ? `Drafted an email to ${to}` : "Drafted an email — add the recipient",
+    summary: resolved ? `Drafted an email to ${to}` : to ? `Drafted an email — add ${to}'s address` : "Drafted an email — add the recipient",
     draft: { to, subject, body },
   };
 }
@@ -651,7 +662,7 @@ const AGENT_SYSTEM = [
   '- find_free_time{durationMinutes?, withinDays?} — find open slots in the user\'s calendar during working hours. Use the returned ISO `start` when you then create_calendar_event for "find me time to…" / "schedule X when I\'m free".',
   '- reschedule_event{id, start, durationMinutes?} — move an event to a new time (get the id from list_events first). `start` is natural language.',
   '- cancel_event{id} — cancel/delete a calendar event (get the id from list_events first).',
-  '- send_email{to, subject, body} — compose an email. This does NOT send — it shows the user a draft to review and send themselves, so always write the FULL, well-composed message body (proper greeting and sign-off), not a placeholder. `to` is the recipient\'s email address if the user gave one; if you don\'t have it, still draft and leave `to` empty for them to fill. Use this whenever the user wants to email/message someone or write/send a mail.',
+  '- send_email{to, subject, body} — compose an email. Put the recipient as a plain NAME in `to` (e.g. "Priyanka", "Santhosh Zakapps") — NEVER invent or guess an email address (do NOT turn "santhosh zakapps" into santhosh@zakapps.com); the system resolves names from the user\'s real contacts. Only put an actual email in `to` if the user literally typed one. Do NOT claim to add anyone to contacts. In the body, never use placeholders like "[Your Name]" — sign off simply (e.g. "Best regards") with no placeholder. This does NOT send — it shows the user a draft to review and send themselves, so always write the FULL, well-composed message body (proper greeting and sign-off), not a placeholder. `to` is the recipient\'s email address if the user gave one; if you don\'t have it, still draft and leave `to` empty for them to fill. Use this whenever the user wants to email/message someone or write/send a mail.',
   "- search_entries{query} — find entries (use before update/connect to get real ids).",
   "- get_entry{id} — read one entry's full details.",
   "- list_projects{} / list_recent{limit?} — browse.",
