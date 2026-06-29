@@ -46,6 +46,8 @@ export async function ingestText(input: IngestInput): Promise<IngestResult> {
   }
 
   const k = await extractKnowledge(text, { source: input.provider, title: input.title });
+  // The distiller flags pure nav/landing pages with no substance — don't save those.
+  if (k.type === "skip") return { ok: true, skipped: true, reason: "No real content worth saving on that page." };
   const type = isEntryType(k.type) ? k.type : isEntryType(input.typeHint ?? "") ? input.typeHint! : "lesson";
 
   const entryInput = buildEntryInput(type, {

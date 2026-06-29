@@ -5,9 +5,11 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const type = searchParams.get("type") ?? undefined;
   const limit = searchParams.get("limit");
+  const offset = searchParams.get("offset");
   const entries = await listEntries({
     type: type && isEntryType(type) ? type : undefined,
     limit: limit ? Number(limit) : undefined,
+    offset: offset ? Number(offset) : undefined,
   });
   return Response.json(entries);
 }

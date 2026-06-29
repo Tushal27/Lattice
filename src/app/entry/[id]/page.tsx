@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ConnectionPanel, type ExistingConnection } from "@/components/entry/ConnectionPanel";
 import { EntryToolbar } from "@/components/entry/EntryToolbar";
 import { GoalFunding } from "@/components/money/GoalFunding";
+import { QuestionDraft } from "@/components/QuestionDraft";
 import { Card, TagChip, TypeBadge } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { entryToFormValues, getEntry, suggestConnections } from "@/lib/entries";
@@ -172,16 +173,7 @@ export default async function EntryPage(props: PageProps<"/entry/[id]">) {
           )}
 
           {aiDraft && (
-            <div className="mb-6 rounded-xl border border-violet-500/25 bg-gradient-to-b from-violet-500/10 to-transparent p-4">
-              <div className="mb-1.5 flex items-center gap-2 text-sm font-semibold text-violet-200">
-                ✦ Draft answer
-                <span className="rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-normal text-zinc-400">AI · review &amp; refine</span>
-              </div>
-              <p className="whitespace-pre-line leading-relaxed text-zinc-200 [overflow-wrap:anywhere]">{aiDraft}</p>
-              <Link href={`/entry/${entry.id}/edit`} className="mt-2 inline-block text-xs font-medium text-violet-300 hover:underline">
-                Refine or accept →
-              </Link>
-            </div>
+            <QuestionDraft entryId={entry.id} initial={aiDraft} accepted={Boolean(entryFields.aiDraftAccepted)} />
           )}
 
           {aiThought && (

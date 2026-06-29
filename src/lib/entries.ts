@@ -161,19 +161,29 @@ export interface ListOptions {
   status?: string;
   projectId?: string;
   limit?: number;
+  offset?: number;
+}
+
+function listWhere(opts: ListOptions) {
+  return {
+    ...(opts.type ? { type: opts.type } : {}),
+    ...(opts.status ? { status: opts.status } : {}),
+    ...(opts.projectId ? { projectId: opts.projectId } : {}),
+  };
 }
 
 export async function listEntries(opts: ListOptions = {}) {
   return prisma.entry.findMany({
-    where: {
-      ...(opts.type ? { type: opts.type } : {}),
-      ...(opts.status ? { status: opts.status } : {}),
-      ...(opts.projectId ? { projectId: opts.projectId } : {}),
-    },
+    where: listWhere(opts),
     include: { tags: { include: { tag: true } }, project: { select: { id: true, title: true } } },
     orderBy: { createdAt: "desc" },
     ...(opts.limit ? { take: opts.limit } : {}),
+    ...(opts.offset ? { skip: opts.offset } : {}),
   });
+}
+
+export async function countEntries(opts: ListOptions = {}) {
+  return prisma.entry.count({ where: listWhere(opts) });
 }
 
 export async function searchEntries(query: string) {

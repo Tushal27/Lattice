@@ -758,11 +758,13 @@ export async function extractKnowledge(
   if (!trimmed) return { source: "local", ...heuristicClassify(ctx.title ?? "") };
 
   const prompt = [
-    `I'm saving content from ${ctx.source}${ctx.title ? ` titled "${ctx.title}"` : ""} into Lattice (my second brain). Distill it into ONE knowledge entry.`,
+    `I'm saving content from ${ctx.source}${ctx.title ? ` titled "${ctx.title}"` : ""} into my second brain. Distill the ACTUAL substance into ONE knowledge entry.`,
+    "IGNORE all page chrome: navigation, menus, lists of names/links, 'find out more', 'collection', cookie/CTA text, author bylines, related-content teasers. Those are noise, not content.",
+    "If the page has no real substance worth remembering (it's just a nav/landing/index page), return {\"type\":\"skip\"} and nothing else.",
+    "Otherwise write the summary as the genuine insight/takeaway in MY voice — what's worth remembering — never a description like 'this page covers…' and never raw scraped text.",
     "Respond with ONLY a JSON object, no markdown:",
-    '{"type":"lesson|aha|question|decision|project|snippet","title":"short clear title","summary":"2-4 sentence distillation of the real takeaways — not a description of the document","tags":["lowercase","tags"]}',
-    "Pick the single best type (prefer lesson or aha for articles/notes, snippet for code). Title under 12 words. 3-5 tags.",
-    "Capture what's actually USEFUL to remember, in my voice — not 'this article discusses…'.",
+    '{"type":"lesson|aha|question|decision|project|snippet|skip","title":"short clear title","summary":"2-4 sentences of the real takeaway","tags":["lowercase","tags"]}',
+    "Title under 12 words. 3-5 tags.",
     "",
     `Content:\n"""${trimmed}"""`,
   ].join("\n");
@@ -771,19 +773,22 @@ export async function extractKnowledge(
   if (ai) {
     const parsed = safeJson(ai);
     if (parsed) {
+      if (String(parsed.type) === "skip") return { source: "ai", type: "skip", title: ctx.title ?? "", summary: "", tags: [] };
       const type = typeof parsed.type === "string" && parsed.type in TYPES ? parsed.type : "lesson";
+      const summary = String(parsed.summary ?? "").trim();
       return {
         source: "ai",
         type,
         title: String(parsed.title ?? ctx.title ?? "").slice(0, 140) || (ctx.title ?? trimmed.slice(0, 80)),
-        summary: String(parsed.summary ?? ""),
+        summary,
         tags: Array.isArray(parsed.tags) ? parsed.tags.map(String).slice(0, 5) : [],
       };
     }
   }
 
-  const base = heuristicClassify(ctx.title ? `${ctx.title}. ${trimmed}` : trimmed);
-  return { source: "local", ...base, title: ctx.title?.slice(0, 140) || base.title };
+  // No AI available: don't dump raw page boilerplate as a "summary" — keep it
+  // to the title and let the full text live in details.
+  return { source: "local", type: "lesson", title: (ctx.title || trimmed.slice(0, 80)).slice(0, 140), summary: "", tags: [] };
 }
 
 function heuristicClassify(text: string): Omit<Classification, "source"> {
