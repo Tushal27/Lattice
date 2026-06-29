@@ -21,10 +21,12 @@ export function ConnectionPanel({
   entryId,
   existing,
   suggestions,
+  suggestionsLoading = false,
 }: {
   entryId: string;
   existing: ExistingConnection[];
   suggestions: RelatedEntry[];
+  suggestionsLoading?: boolean;
 }) {
   // Local, optimistic state so link/unlink feel instant — no full page refresh.
   const [existingList, setExistingList] = useState(existing);
@@ -115,6 +117,16 @@ export function ConnectionPanel({
           </ul>
         )}
       </section>
+
+      {suggestionsLoading && (
+        <section>
+          <h3 className="section-label mb-3">You might connect…</h3>
+          <p className="flex items-center gap-2 text-sm text-zinc-500">
+            <span className="h-3 w-3 animate-spin rounded-full border-2 border-zinc-600 border-t-zinc-300" />
+            Finding related ideas…
+          </p>
+        </section>
+      )}
 
       {suggestList.length > 0 && (
         <section>

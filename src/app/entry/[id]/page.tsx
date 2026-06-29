@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ConnectionPanel, type ExistingConnection } from "@/components/entry/ConnectionPanel";
@@ -69,8 +70,6 @@ export default async function EntryPage(props: PageProps<"/entry/[id]">) {
       summary: c.from.summary,
     })),
   ];
-
-  const suggestions = await suggestConnections(entry.id, 5);
 
   // For a goal: offer one-tap linking of the monthly SIPs that fund it.
   let goalFunding: React.ReactNode = null;
@@ -286,9 +285,19 @@ export default async function EntryPage(props: PageProps<"/entry/[id]">) {
         </div>
 
         <div className="lg:border-l lg:border-zinc-800/80 lg:pl-8">
-          <ConnectionPanel entryId={entry.id} existing={existing} suggestions={suggestions} />
+          <Suspense fallback={<ConnectionPanel entryId={entry.id} existing={existing} suggestions={[]} suggestionsLoading />}>
+            <SuggestionsRail entryId={entry.id} existing={existing} />
+          </Suspense>
         </div>
       </div>
     </div>
   );
+}
+
+// Suggestions need a semantic-similarity pass (and sometimes an on-demand
+// embedding round-trip), so they stream in separately — the entry itself
+// paints instantly instead of waiting on this.
+async function SuggestionsRail({ entryId, existing }: { entryId: string; existing: ExistingConnection[] }) {
+  const suggestions = await suggestConnections(entryId, 5);
+  return <ConnectionPanel entryId={entryId} existing={existing} suggestions={suggestions} />;
 }
