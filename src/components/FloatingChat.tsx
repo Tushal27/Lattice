@@ -989,6 +989,11 @@ function EmailDraftCard({ draft }: { draft: EmailDraft }) {
       <div className="mb-2 flex items-center gap-2 text-[11px] font-medium text-sky-300">📧 Draft email · review &amp; send</div>
       <div className="space-y-2">
         <input value={to} onChange={(e) => setTo(e.target.value)} placeholder="recipient@email.com" className={field} />
+        {to.trim() && !to.includes("@") && (
+          <p className="text-[11px] text-amber-300/90">
+            &ldquo;{to.trim()}&rdquo; isn&apos;t in your Contacts — enter their email address to send.
+          </p>
+        )}
         <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject" className={field} />
         <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={6} className={`${field} resize-y leading-relaxed`} />
       </div>

@@ -86,21 +86,62 @@ export async function getContacts(force = false): Promise<Contact[]> {
   return list;
 }
 
-/** Match a name against an already-loaded contact list (exact → first-name →
- *  substring). Pure, so it can be reused across many names without re-reading
- *  the cache for each one. */
+const HONORIFICS = new Set(["dr", "mr", "mrs", "ms", "miss", "prof", "sir", "madam", "mx"]);
+
+// Normalize a name for matching: drop punctuation (so "S. Jagan" == "S Jagan"),
+// lowercase, collapse spaces.
+const cleanName = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+// Meaningful name tokens (honorifics dropped) — so "Dr. S jagan" → ["s","jagan"].
+const nameTokens = (s: string) => cleanName(s).split(" ").filter((t) => t && !HONORIFICS.has(t));
+
+/**
+ * Match a spoken name against an already-loaded contact list, tolerant of
+ * honorifics, initials, dots, and word order ("Dr. S jagan" → "Dr. S. Jagan
+ * Raj"). Pure, so it can be reused across many names without re-reading the
+ * cache. Returns null rather than guessing when a multi-word name has no
+ * confident match — so the assistant leaves it for the user instead of sending
+ * to the wrong person.
+ */
 export function matchContactEmail(name: string, list: Contact[]): string | null {
-  const n = name.trim().toLowerCase();
-  if (!n) return null;
-  if (n.includes("@")) return name.trim();
-  if (list.length === 0) return null;
-  const first = n.split(" ")[0];
-  return (
-    list.find((c) => c.name.toLowerCase() === n)?.email ??
-    list.find((c) => c.name.toLowerCase().split(" ")[0] === first)?.email ??
-    list.find((c) => c.name.toLowerCase().includes(n))?.email ??
-    null
-  );
+  const raw = name.trim();
+  if (raw.includes("@")) return raw;
+  const n = cleanName(raw);
+  if (!n || list.length === 0) return null;
+  const q = nameTokens(raw);
+  if (q.length === 0) return null;
+
+  // 1. Exact / substring on the full cleaned name (either direction).
+  const exact = list.find((c) => cleanName(c.name) === n);
+  if (exact) return exact.email;
+  const sub = list.find((c) => {
+    const cn = cleanName(c.name);
+    return cn.includes(n) || n.includes(cn);
+  });
+  if (sub) return sub.email;
+
+  // 2. Every query token appears in the contact's tokens ("s jagan" ⊆ "s jagan raj").
+  const all = list.find((c) => {
+    const ct = new Set(nameTokens(c.name));
+    return q.every((t) => ct.has(t));
+  });
+  if (all) return all.email;
+
+  // 3. Single-word query (a first name like "Priyanka"): match on any token.
+  //    Multi-word names without a full match stay unresolved on purpose.
+  if (q.length === 1) {
+    const t = q[0];
+    const hit =
+      list.find((c) => nameTokens(c.name).includes(t)) ??
+      list.find((c) => cleanName(c.name).includes(t));
+    if (hit) return hit.email;
+  }
+  return null;
 }
 
 /** Best-effort: resolve a name to a contact's email address. */
