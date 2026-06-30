@@ -1,5 +1,5 @@
 import { extractPeople } from "@/lib/companion";
-import { resolveContactEmail } from "@/lib/contacts";
+import { getContacts, matchContactEmail, resolveContactEmail } from "@/lib/contacts";
 import { prisma } from "@/lib/db";
 
 // CRM-lite: a people index auto-derived from the user's entries. Each person
@@ -17,11 +17,15 @@ export interface PersonRow {
   id: string;
   name: string;
   aka: string | null;
+  /** Resolved sendable address (null = no email on file → not emailable). */
+  email: string | null;
   summary: string | null;
   mentions: Mention[];
   weight: number;
   updatedAt: Date;
 }
+
+const isEmail = (s: string | null | undefined): s is string => !!s && /\S+@\S+\.\S+/.test(s);
 
 function parseMentions(raw: string | null): Mention[] {
   try {
@@ -33,12 +37,42 @@ function parseMentions(raw: string | null): Mention[] {
 
 export async function listPeople(limit = 100): Promise<PersonRow[]> {
   const rows = await prisma.person.findMany({ orderBy: [{ weight: "desc" }, { updatedAt: "desc" }], take: limit });
-  return rows.map((p) => ({ ...p, mentions: parseMentions(p.mentions) }));
+  return rows.map((p) => ({ ...p, email: isEmail(p.aka) ? p.aka : null, mentions: parseMentions(p.mentions) }));
 }
 
 export async function getPerson(id: string): Promise<PersonRow | null> {
   const p = await prisma.person.findUnique({ where: { id } });
-  return p ? { ...p, mentions: parseMentions(p.mentions) } : null;
+  return p ? { ...p, email: isEmail(p.aka) ? p.aka : null, mentions: parseMentions(p.mentions) } : null;
+}
+
+/**
+ * Fill in emails from Google Contacts for people who don't have one yet (e.g.
+ * captured before Contacts was connected), persist the new matches, and report
+ * whether Contacts is even available — so the UI can tell "no email on file"
+ * apart from "can't check, Contacts not connected".
+ */
+export async function attachEmails(
+  people: PersonRow[],
+): Promise<{ people: PersonRow[]; contactsConnected: boolean }> {
+  const contacts = await getContacts().catch(() => []);
+  if (contacts.length === 0) return { people, contactsConnected: false };
+
+  const backfill: { id: string; email: string }[] = [];
+  const enriched = people.map((p) => {
+    if (isEmail(p.email)) return p;
+    const email = matchContactEmail(p.name, contacts);
+    if (!email) return p;
+    backfill.push({ id: p.id, email });
+    return { ...p, email, aka: email };
+  });
+
+  // Persist the freshly-resolved addresses so the next load is instant.
+  if (backfill.length) {
+    await Promise.all(
+      backfill.map((b) => prisma.person.update({ where: { id: b.id }, data: { aka: b.email } }).catch(() => {})),
+    );
+  }
+  return { people: enriched, contactsConnected: true };
 }
 
 export async function addPersonNote(id: string, note: string): Promise<void> {

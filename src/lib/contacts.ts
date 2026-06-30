@@ -59,11 +59,13 @@ export async function getContacts(force = false): Promise<Contact[]> {
   return list;
 }
 
-/** Best-effort: resolve a name to a contact's email address. */
-export async function resolveContactEmail(name: string): Promise<string | null> {
+/** Match a name against an already-loaded contact list (exact → first-name →
+ *  substring). Pure, so it can be reused across many names without re-reading
+ *  the cache for each one. */
+export function matchContactEmail(name: string, list: Contact[]): string | null {
   const n = name.trim().toLowerCase();
-  if (!n || n.includes("@")) return n.includes("@") ? name.trim() : null;
-  const list = await getContacts();
+  if (!n) return null;
+  if (n.includes("@")) return name.trim();
   if (list.length === 0) return null;
   const first = n.split(" ")[0];
   return (
@@ -72,6 +74,13 @@ export async function resolveContactEmail(name: string): Promise<string | null> 
     list.find((c) => c.name.toLowerCase().includes(n))?.email ??
     null
   );
+}
+
+/** Best-effort: resolve a name to a contact's email address. */
+export async function resolveContactEmail(name: string): Promise<string | null> {
+  const n = name.trim();
+  if (n.includes("@")) return n;
+  return matchContactEmail(n, await getContacts());
 }
 
 /** Is this exact email address one of the user's saved contacts? */

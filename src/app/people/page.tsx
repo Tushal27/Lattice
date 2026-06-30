@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { PeopleSync } from "@/components/PeopleSync";
 import { EmptyState, PageHeader } from "@/components/ui";
-import { listPeople } from "@/lib/people";
+import { attachEmails, listPeople } from "@/lib/people";
 
 export const dynamic = "force-dynamic";
 
 export default async function PeoplePage() {
-  const people = await listPeople();
+  const { people, contactsConnected } = await attachEmails(await listPeople());
+  const emailable = people.filter((p) => p.email).length;
 
   return (
     <div className="animate-[fadeUp_0.4s_ease-out] space-y-6">
@@ -17,6 +18,26 @@ export default async function PeoplePage() {
         subtitle="Everyone you work with — and what your brain already knows about them. Built from your notes (Contacts adds their emails)."
         action={<PeopleSync empty={people.length === 0} />}
       />
+
+      {people.length > 0 && (
+        <div className="rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3 text-sm">
+          {contactsConnected ? (
+            <p className="text-zinc-400">
+              <span className="font-medium text-emerald-300">{emailable}</span> of {people.length} can be emailed by
+              name — look for the <span className="font-medium text-emerald-300">✉︎ email</span> badge. The rest have no
+              address in your Contacts, so the assistant won&apos;t try to send to them.
+            </p>
+          ) : (
+            <p className="text-zinc-400">
+              Google Contacts isn&apos;t connected, so no one shows an email yet.{" "}
+              <Link href="/settings" className="font-medium text-sky-300 hover:underline">
+                Connect it in Settings
+              </Link>{" "}
+              to email people by name.
+            </p>
+          )}
+        </div>
+      )}
 
       {people.length === 0 ? (
         <EmptyState
@@ -40,10 +61,21 @@ export default async function PeoplePage() {
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-sky-500/30 to-violet-500/30 text-sm font-semibold text-zinc-100">
                   {p.name.slice(0, 1).toUpperCase()}
                 </span>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <h3 className="truncate font-semibold text-zinc-100">{p.name}</h3>
-                  {p.aka && <p className="truncate text-[11px] text-zinc-500">{p.aka}</p>}
+                  {p.email ? (
+                    <p className="truncate text-[11px] text-emerald-300/90" title={p.email}>
+                      ✉︎ {p.email}
+                    </p>
+                  ) : contactsConnected ? (
+                    <p className="text-[11px] text-zinc-600">no email — not sendable</p>
+                  ) : null}
                 </div>
+                {p.email && (
+                  <span className="shrink-0 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
+                    email
+                  </span>
+                )}
               </div>
 
               {p.summary && <p className="mt-3 text-sm leading-relaxed text-zinc-300">{p.summary}</p>}
