@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ContactsList } from "@/components/ContactsList";
 import { PeopleSync } from "@/components/PeopleSync";
 import { EmptyState, PageHeader } from "@/components/ui";
 import { attachEmails, listPeople, type ContactsState } from "@/lib/people";
@@ -21,6 +22,7 @@ export default async function PeoplePage() {
       {people.length > 0 && (
         <div className="rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3 text-sm text-zinc-400">
           <ContactsBanner state={state} total={people.length} />
+          {state.haveList && <ContactsList count={state.saved} />}
         </div>
       )}
 
