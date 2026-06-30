@@ -22,7 +22,7 @@ export default async function PeoplePage() {
       {people.length > 0 && (
         <div className="rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3 text-sm text-zinc-400">
           <ContactsBanner state={state} total={people.length} />
-          {state.haveList && <ContactsList count={state.saved} />}
+          {state.withEmail > 0 && <ContactsList count={state.withEmail} />}
         </div>
       )}
 
@@ -54,7 +54,7 @@ export default async function PeoplePage() {
                     <p className="truncate text-[11px] text-emerald-300/90" title={p.email}>
                       ✉︎ {p.email}
                     </p>
-                  ) : state.haveList ? (
+                  ) : state.withEmail > 0 ? (
                     <p className="text-[11px] text-zinc-600">not in Contacts — not sendable</p>
                   ) : null}
                 </div>
@@ -108,7 +108,7 @@ function ContactsBanner({ state, total }: { state: ContactsState; total: number 
     );
   }
 
-  if (state.haveList) {
+  if (state.withEmail > 0) {
     return (
       <p>
         <span className="font-medium text-emerald-300">{state.matched}</span> of {total} can be emailed by name — look
@@ -120,7 +120,7 @@ function ContactsBanner({ state, total }: { state: ContactsState; total: number 
     );
   }
 
-  // Connected, but no usable saved-contact list came back — say exactly why.
+  // Connected, but nothing emailable came back — say exactly why.
   if (state.status >= 400) {
     return (
       <p>
@@ -129,21 +129,30 @@ function ContactsBanner({ state, total }: { state: ContactsState; total: number 
       </p>
     );
   }
-  if (state.status === 200 && state.saved === 0 && state.other > 0) {
+  if (state.status === 200 && state.saved > 0) {
     return (
       <p>
-        Google is connected, but your {state.other} contacts are all auto-collected{" "}
-        <span className="text-zinc-300">&quot;Other contacts&quot;</span> (from past mail), which Google doesn&apos;t
-        share for sending. Open them in Google Contacts and save them to <span className="text-zinc-300">My
-        Contacts</span> to make them emailable.
+        Google is connected and you have <span className="text-zinc-300">{state.saved}</span> saved contacts, but{" "}
+        <span className="text-amber-300">none has an email address</span> stored (likely phone-only) — so there&apos;s no
+        one to email by name yet. Add emails to them in Google Contacts, or reconnect in {settingsLink} to also pull in
+        people auto-collected from your mail.
+      </p>
+    );
+  }
+  if (state.status === 200 && state.other > 0) {
+    return (
+      <p>
+        Google is connected, but your contacts are all auto-collected{" "}
+        <span className="text-zinc-300">&quot;Other contacts&quot;</span>. Reconnect in {settingsLink} to grant access to
+        them, or save them to <span className="text-zinc-300">My Contacts</span>.
       </p>
     );
   }
   if (state.status === 200) {
     return (
       <p>
-        Google is connected, but you have no saved Google Contacts yet. Add some in Google Contacts and they&apos;ll
-        become emailable here.
+        Google is connected, but you have no Google Contacts with emails yet. Add some in Google Contacts and
+        they&apos;ll become emailable here.
       </p>
     );
   }

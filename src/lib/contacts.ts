@@ -12,32 +12,59 @@ export interface Contact {
   email: string;
 }
 
+interface ApiPerson {
+  names?: { displayName?: string }[];
+  emailAddresses?: { value?: string }[];
+}
+
+function collect(into: Map<string, Contact>, people: ApiPerson[]) {
+  for (const p of people) {
+    const name = p.names?.[0]?.displayName;
+    const email = p.emailAddresses?.[0]?.value;
+    if (name && email && !into.has(email.toLowerCase())) into.set(email.toLowerCase(), { name, email });
+  }
+}
+
 async function fetchContacts(): Promise<Contact[]> {
   const token = await accessToken();
   if (!token) return [];
-  const out: Contact[] = [];
+  const headers = { Authorization: `Bearer ${token}` };
+  const byEmail = new Map<string, Contact>();
+
+  // 1. Saved contacts ("My Contacts").
   let pageToken = "";
   for (let i = 0; i < 6; i++) {
     const params = new URLSearchParams({ personFields: "names,emailAddresses", pageSize: "200" });
     if (pageToken) params.set("pageToken", pageToken);
     const res = await fetch(`https://people.googleapis.com/v1/people/me/connections?${params.toString()}`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers,
       signal: AbortSignal.timeout(15000),
     });
     if (!res.ok) break;
-    const data = (await res.json()) as {
-      connections?: { names?: { displayName?: string }[]; emailAddresses?: { value?: string }[] }[];
-      nextPageToken?: string;
-    };
-    for (const p of data.connections ?? []) {
-      const name = p.names?.[0]?.displayName;
-      const email = p.emailAddresses?.[0]?.value;
-      if (name && email) out.push({ name, email });
-    }
+    const data = (await res.json()) as { connections?: ApiPerson[]; nextPageToken?: string };
+    collect(byEmail, data.connections ?? []);
     pageToken = data.nextPageToken ?? "";
     if (!pageToken) break;
   }
-  return out;
+
+  // 2. Auto-collected "Other contacts" (from your mail). Needs the
+  // contacts.other.readonly scope — skipped silently (4xx) until it's granted.
+  pageToken = "";
+  for (let i = 0; i < 6; i++) {
+    const params = new URLSearchParams({ readMask: "names,emailAddresses", pageSize: "200" });
+    if (pageToken) params.set("pageToken", pageToken);
+    const res = await fetch(`https://people.googleapis.com/v1/otherContacts?${params.toString()}`, {
+      headers,
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) break;
+    const data = (await res.json()) as { otherContacts?: ApiPerson[]; nextPageToken?: string };
+    collect(byEmail, data.otherContacts ?? []);
+    pageToken = data.nextPageToken ?? "";
+    if (!pageToken) break;
+  }
+
+  return [...byEmail.values()];
 }
 
 export async function getContacts(force = false): Promise<Contact[]> {

@@ -49,8 +49,8 @@ export async function getPerson(id: string): Promise<PersonRow | null> {
 export interface ContactsState {
   /** Is a Google account linked at all (token present)? */
   googleConnected: boolean;
-  /** Did we get a usable contact list to match against? */
-  haveList: boolean;
+  /** Contacts that actually have an email address — the emailable list size. */
+  withEmail: number;
   /** People-API HTTP status from a live probe (200 ok, 403 scope, 0 no token). */
   status: number;
   /** Saved ("My Contacts") count and auto-collected ("Other contacts") count. */
@@ -87,30 +87,24 @@ export async function attachEmails(
   }
   const matched = enriched.filter((p) => isEmail(p.email)).length;
 
-  // Happy path: we have a list, so Contacts is clearly working — no extra probe.
+  // Happy path: we have emailable contacts, so Contacts is working — no probe.
   if (contacts.length > 0) {
     return {
       people: enriched,
-      state: { googleConnected: true, haveList: true, status: 200, saved: contacts.length, other: 0, matched },
+      state: { googleConnected: true, withEmail: contacts.length, status: 200, saved: contacts.length, other: 0, matched },
     };
   }
 
-  // No list came back — diagnose precisely instead of assuming "not connected".
+  // Nothing emailable came back — diagnose precisely (connected? scope? saved
+  // contacts that simply have no email address? only auto-collected ones?).
   const connected = await googleConnected().catch(() => false);
   if (!connected) {
-    return { people: enriched, state: { googleConnected: false, haveList: false, status: 0, saved: 0, other: 0, matched } };
+    return { people: enriched, state: { googleConnected: false, withEmail: 0, status: 0, saved: 0, other: 0, matched } };
   }
   const diag = await contactsDiagnostic().catch(() => ({ status: -1, count: 0, otherCount: 0 }));
   return {
     people: enriched,
-    state: {
-      googleConnected: true,
-      haveList: diag.count > 0,
-      status: diag.status,
-      saved: diag.count,
-      other: diag.otherCount,
-      matched,
-    },
+    state: { googleConnected: true, withEmail: 0, status: diag.status, saved: diag.count, other: diag.otherCount, matched },
   };
 }
 

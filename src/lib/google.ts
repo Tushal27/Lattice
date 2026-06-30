@@ -21,6 +21,9 @@ const SCOPES = [
   "https://www.googleapis.com/auth/calendar.readonly",
   // read-only contacts: resolve "email John" to John's address + enrich people.
   "https://www.googleapis.com/auth/contacts.readonly",
+  // auto-collected "Other contacts" (harvested from your mail) — this is where
+  // most people you email actually live, even when they're not saved contacts.
+  "https://www.googleapis.com/auth/contacts.other.readonly",
 ];
 
 export function googleEnabled(): boolean {
