@@ -1,13 +1,12 @@
 import Link from "next/link";
 import { PeopleSync } from "@/components/PeopleSync";
 import { EmptyState, PageHeader } from "@/components/ui";
-import { attachEmails, listPeople } from "@/lib/people";
+import { attachEmails, listPeople, type ContactsState } from "@/lib/people";
 
 export const dynamic = "force-dynamic";
 
 export default async function PeoplePage() {
-  const { people, contactsConnected } = await attachEmails(await listPeople());
-  const emailable = people.filter((p) => p.email).length;
+  const { people, state } = await attachEmails(await listPeople());
 
   return (
     <div className="animate-[fadeUp_0.4s_ease-out] space-y-6">
@@ -20,22 +19,8 @@ export default async function PeoplePage() {
       />
 
       {people.length > 0 && (
-        <div className="rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3 text-sm">
-          {contactsConnected ? (
-            <p className="text-zinc-400">
-              <span className="font-medium text-emerald-300">{emailable}</span> of {people.length} can be emailed by
-              name — look for the <span className="font-medium text-emerald-300">✉︎ email</span> badge. The rest have no
-              address in your Contacts, so the assistant won&apos;t try to send to them.
-            </p>
-          ) : (
-            <p className="text-zinc-400">
-              Google Contacts isn&apos;t connected, so no one shows an email yet.{" "}
-              <Link href="/settings" className="font-medium text-sky-300 hover:underline">
-                Connect it in Settings
-              </Link>{" "}
-              to email people by name.
-            </p>
-          )}
+        <div className="rounded-xl border border-white/8 bg-white/[0.02] px-4 py-3 text-sm text-zinc-400">
+          <ContactsBanner state={state} total={people.length} />
         </div>
       )}
 
@@ -67,8 +52,8 @@ export default async function PeoplePage() {
                     <p className="truncate text-[11px] text-emerald-300/90" title={p.email}>
                       ✉︎ {p.email}
                     </p>
-                  ) : contactsConnected ? (
-                    <p className="text-[11px] text-zinc-600">no email — not sendable</p>
+                  ) : state.haveList ? (
+                    <p className="text-[11px] text-zinc-600">not in Contacts — not sendable</p>
                   ) : null}
                 </div>
                 {p.email && (
@@ -99,5 +84,71 @@ export default async function PeoplePage() {
         </div>
       )}
     </div>
+  );
+}
+
+const settingsLink = (
+  <Link href="/settings" className="font-medium text-sky-300 hover:underline">
+    Settings
+  </Link>
+);
+
+// Tells the true story of why people do/don't have emails, so a public figure
+// who isn't a contact, a missing permission, and a disconnected account never
+// get collapsed into one misleading "not connected" message.
+function ContactsBanner({ state, total }: { state: ContactsState; total: number }) {
+  if (!state.googleConnected) {
+    return (
+      <p>
+        Google Contacts isn&apos;t connected, so no one shows an email yet. Connect it in {settingsLink} to email people
+        by name.
+      </p>
+    );
+  }
+
+  if (state.haveList) {
+    return (
+      <p>
+        <span className="font-medium text-emerald-300">{state.matched}</span> of {total} can be emailed by name — look
+        for the <span className="font-medium text-emerald-300">✉︎ email</span> badge.{" "}
+        {state.matched < total
+          ? "The rest aren't in your Google Contacts, so the assistant won't try to send to them."
+          : "Everyone here is in your Contacts."}
+      </p>
+    );
+  }
+
+  // Connected, but no usable saved-contact list came back — say exactly why.
+  if (state.status >= 400) {
+    return (
+      <p>
+        Google is connected, but the Contacts permission wasn&apos;t granted (HTTP {state.status}). Reconnect in{" "}
+        {settingsLink} and make sure you allow <span className="text-zinc-300">Contacts</span> on the consent screen.
+      </p>
+    );
+  }
+  if (state.status === 200 && state.saved === 0 && state.other > 0) {
+    return (
+      <p>
+        Google is connected, but your {state.other} contacts are all auto-collected{" "}
+        <span className="text-zinc-300">&quot;Other contacts&quot;</span> (from past mail), which Google doesn&apos;t
+        share for sending. Open them in Google Contacts and save them to <span className="text-zinc-300">My
+        Contacts</span> to make them emailable.
+      </p>
+    );
+  }
+  if (state.status === 200) {
+    return (
+      <p>
+        Google is connected, but you have no saved Google Contacts yet. Add some in Google Contacts and they&apos;ll
+        become emailable here.
+      </p>
+    );
+  }
+  return (
+    <p>
+      Google is connected, but Contacts couldn&apos;t be reached right now. Try again in a moment, or reconnect in{" "}
+      {settingsLink}.
+    </p>
   );
 }

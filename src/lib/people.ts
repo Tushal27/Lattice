@@ -1,6 +1,7 @@
 import { extractPeople } from "@/lib/companion";
-import { getContacts, matchContactEmail, resolveContactEmail } from "@/lib/contacts";
+import { contactsDiagnostic, getContacts, matchContactEmail, resolveContactEmail } from "@/lib/contacts";
 import { prisma } from "@/lib/db";
+import { googleConnected } from "@/lib/google";
 
 // CRM-lite: a people index auto-derived from the user's entries. Each person
 // aggregates a short "what I know" note plus the entries they came up in, so the
@@ -45,17 +46,31 @@ export async function getPerson(id: string): Promise<PersonRow | null> {
   return p ? { ...p, email: isEmail(p.aka) ? p.aka : null, mentions: parseMentions(p.mentions) } : null;
 }
 
+export interface ContactsState {
+  /** Is a Google account linked at all (token present)? */
+  googleConnected: boolean;
+  /** Did we get a usable contact list to match against? */
+  haveList: boolean;
+  /** People-API HTTP status from a live probe (200 ok, 403 scope, 0 no token). */
+  status: number;
+  /** Saved ("My Contacts") count and auto-collected ("Other contacts") count. */
+  saved: number;
+  other: number;
+  /** How many of the listed people we could resolve an email for. */
+  matched: number;
+}
+
 /**
  * Fill in emails from Google Contacts for people who don't have one yet (e.g.
  * captured before Contacts was connected), persist the new matches, and report
- * whether Contacts is even available — so the UI can tell "no email on file"
- * apart from "can't check, Contacts not connected".
+ * the *real* contacts state — so the UI can tell apart "not connected",
+ * "connected but no saved contacts", "permission missing", and "connected fine,
+ * this person just isn't a contact".
  */
 export async function attachEmails(
   people: PersonRow[],
-): Promise<{ people: PersonRow[]; contactsConnected: boolean }> {
+): Promise<{ people: PersonRow[]; state: ContactsState }> {
   const contacts = await getContacts().catch(() => []);
-  if (contacts.length === 0) return { people, contactsConnected: false };
 
   const backfill: { id: string; email: string }[] = [];
   const enriched = people.map((p) => {
@@ -65,14 +80,38 @@ export async function attachEmails(
     backfill.push({ id: p.id, email });
     return { ...p, email, aka: email };
   });
-
-  // Persist the freshly-resolved addresses so the next load is instant.
   if (backfill.length) {
     await Promise.all(
       backfill.map((b) => prisma.person.update({ where: { id: b.id }, data: { aka: b.email } }).catch(() => {})),
     );
   }
-  return { people: enriched, contactsConnected: true };
+  const matched = enriched.filter((p) => isEmail(p.email)).length;
+
+  // Happy path: we have a list, so Contacts is clearly working — no extra probe.
+  if (contacts.length > 0) {
+    return {
+      people: enriched,
+      state: { googleConnected: true, haveList: true, status: 200, saved: contacts.length, other: 0, matched },
+    };
+  }
+
+  // No list came back — diagnose precisely instead of assuming "not connected".
+  const connected = await googleConnected().catch(() => false);
+  if (!connected) {
+    return { people: enriched, state: { googleConnected: false, haveList: false, status: 0, saved: 0, other: 0, matched } };
+  }
+  const diag = await contactsDiagnostic().catch(() => ({ status: -1, count: 0, otherCount: 0 }));
+  return {
+    people: enriched,
+    state: {
+      googleConnected: true,
+      haveList: diag.count > 0,
+      status: diag.status,
+      saved: diag.count,
+      other: diag.otherCount,
+      matched,
+    },
+  };
 }
 
 export async function addPersonNote(id: string, note: string): Promise<void> {
