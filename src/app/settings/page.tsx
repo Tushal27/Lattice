@@ -1,4 +1,5 @@
 import { ActivityLog } from "@/components/ActivityLog";
+import { AiProviderToggle } from "@/components/AiProviderToggle";
 import { AutonomyConfig } from "@/components/AutonomyConfig";
 import { AutonomyNow } from "@/components/AutonomyNow";
 import { BookmarkletCard } from "@/components/BookmarkletCard";
@@ -16,6 +17,7 @@ export const dynamic = "force-dynamic";
 
 const JUMPS = [
   { id: "demo", label: "🎬 Demo" },
+  { id: "ai", label: "✦ AI" },
   { id: "integrations", label: "🔗 Integrations" },
   { id: "ingest", label: "📥 Ingest" },
   { id: "autonomy", label: "🤖 Autonomy" },
@@ -49,6 +51,14 @@ export default function SettingsPage() {
       <section id="demo" className="scroll-mt-24 space-y-3">
         <h2 className="section-label px-1">🎬 Demo</h2>
         <DemoControl />
+      </section>
+
+      <section id="ai" className="scroll-mt-24 space-y-3">
+        <h2 className="section-label px-1">✦ AI engine</h2>
+        <p className="px-1 text-sm text-zinc-500">
+          Which models power Lattice. By default it falls back to public providers if your own roster is unavailable.
+        </p>
+        <AiProviderToggle />
       </section>
 
       <section id="integrations" className="scroll-mt-24 space-y-3">

@@ -13,6 +13,8 @@
 // Override with AI_PROVIDER_ORDER="mistral,groq,gemini" or pin one with
 // AI_PROVIDER="groq". No keys → callers fall back to local heuristics.
 
+import { prisma } from "@/lib/db";
+
 type Kind = "openai" | "gemini";
 
 interface ProviderSpec {
@@ -115,9 +117,11 @@ function resolveUrl(spec: ProviderSpec): string {
   return spec.url;
 }
 
-function candidates(): Candidate[] {
+function candidates(rosterOnly = false): Candidate[] {
   const out: Candidate[] = [];
   for (const name of resolveOrder()) {
+    // Roster-only mode: use just the user's own endpoint, no fallback providers.
+    if (rosterOnly && name !== "custom") continue;
     const spec = REGISTRY.find((s) => s.name === name);
     if (!spec) continue;
     const raw = process.env[spec.keyEnv];
@@ -136,9 +140,44 @@ export function aiEnabled(): boolean {
   return candidates().length > 0;
 }
 
+/** Is the user's own roster/endpoint (the "custom" provider) configured? */
+export function rosterConfigured(): boolean {
+  return candidates().some((c) => c.spec.name === "custom");
+}
+
 /** Names of the providers that have at least one key configured, in try order. */
 export function configuredProviders(): string[] {
   return [...new Set(candidates().map((c) => c.spec.name))];
+}
+
+// ---- runtime AI preferences (DB-backed, tunable in Settings) ----------------
+
+export interface AiConfig {
+  /** Use only the user's roster endpoint — never fall back to Groq/others. */
+  rosterOnly: boolean;
+}
+
+const AI_CONFIG_KEY = "ai:config";
+const DEFAULT_AI_CONFIG: AiConfig = { rosterOnly: false };
+
+export async function getAiConfig(): Promise<AiConfig> {
+  try {
+    const row = await prisma.appState.findUnique({ where: { key: AI_CONFIG_KEY } });
+    if (!row) return DEFAULT_AI_CONFIG;
+    return { ...DEFAULT_AI_CONFIG, ...(JSON.parse(row.value) as Partial<AiConfig>) };
+  } catch {
+    return DEFAULT_AI_CONFIG;
+  }
+}
+
+export async function setAiConfig(patch: Partial<AiConfig>): Promise<AiConfig> {
+  const next = { ...(await getAiConfig()), ...patch };
+  await prisma.appState.upsert({
+    where: { key: AI_CONFIG_KEY },
+    create: { key: AI_CONFIG_KEY, value: JSON.stringify(next) },
+    update: { value: JSON.stringify(next) },
+  });
+  return next;
 }
 
 interface GenerateOptions {
@@ -159,7 +198,8 @@ export async function generateDetailed(
   prompt: string,
   opts: GenerateOptions = {},
 ): Promise<{ text: string; provider: string } | null> {
-  const cands = candidates();
+  const { rosterOnly } = await getAiConfig();
+  const cands = candidates(rosterOnly);
   if (cands.length === 0) return null;
 
   // Two passes: the first walks every provider/key; the second gives transient
@@ -194,7 +234,8 @@ export async function generate(prompt: string, opts: GenerateOptions = {}): Prom
  * nothing if every candidate fails, so callers can fall back.
  */
 export async function* streamText(prompt: string, opts: GenerateOptions = {}): AsyncGenerator<string, void, unknown> {
-  for (const c of candidates()) {
+  const { rosterOnly } = await getAiConfig();
+  for (const c of candidates(rosterOnly)) {
     let any = false;
     try {
       const gen =
