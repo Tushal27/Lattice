@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copy to: android/app/src/main/res/values/lattice.xml
+     Fill in your webhook URL and the SMS_INGEST_SECRET (or CRON_SECRET) you set
+     in Vercel. Keep this file out of any public repo — it holds your secret. -->
+<resources>
+    <string name="lattice_ingest_url">https://lattice-pink.vercel.app/api/sms</string>
+    <string name="lattice_ingest_secret">REPLACE_WITH_YOUR_SECRET</string>
+</resources>

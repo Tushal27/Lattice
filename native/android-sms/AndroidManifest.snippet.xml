@@ -1,0 +1,16 @@
+<!-- Merge these into android/app/src/main/AndroidManifest.xml. -->
+
+<!-- 1. Permissions — put above the <application> tag. -->
+<uses-permission android:name="android.permission.RECEIVE_SMS" />
+<uses-permission android:name="android.permission.INTERNET" />
+
+<!-- 2. Receiver — put INSIDE the <application> element, alongside the existing
+        MainActivity. High priority so it wakes for incoming SMS. -->
+<receiver
+    android:name=".SmsForwardReceiver"
+    android:exported="true"
+    android:permission="android.permission.BROADCAST_SMS">
+    <intent-filter android:priority="999">
+        <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+    </intent-filter>
+</receiver>
