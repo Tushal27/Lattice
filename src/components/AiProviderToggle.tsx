@@ -76,13 +76,13 @@ export function AiProviderToggle() {
           aria-checked={cfg.rosterOnly}
           onClick={toggle}
           disabled={busy}
-          className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 ${
+          className={`inline-flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors disabled:opacity-50 ${
             cfg.rosterOnly ? "bg-violet-600" : "bg-zinc-700"
           }`}
         >
           <span
-            className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
-              cfg.rosterOnly ? "translate-x-[22px]" : "translate-x-0.5"
+            className={`h-5 w-5 rounded-full bg-white shadow transition-transform ${
+              cfg.rosterOnly ? "translate-x-5" : "translate-x-0"
             }`}
           />
         </button>

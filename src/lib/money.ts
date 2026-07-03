@@ -30,35 +30,38 @@ export interface ProjectedGoal {
 export async function goalsWithProjection(): Promise<ProjectedGoal[]> {
   const [goals, investments, connections] = await Promise.all([
     prisma.entry.findMany({ where: { type: "goal" }, select: { id: true, title: true, fields: true, status: true } }),
-    prisma.entry.findMany({ where: { type: "investment" }, select: { id: true, fields: true, status: true } }),
+    prisma.entry.findMany({ where: { type: "investment" }, select: { id: true, fields: true, status: true, occurredAt: true, createdAt: true } }),
     prisma.connection.findMany({ select: { fromId: true, toId: true } }),
   ]);
 
-  // Per active investment: its monthly-equivalent contribution, and any one-time
-  // lump (which counts toward "already saved", not a recurring contribution).
-  const invInfo = new Map<string, { monthly: number; lump: number }>();
+  // Per active investment: its monthly-equivalent contribution (future rate),
+  // and how much it has ALREADY put in (one-time lump, or every SIP installment
+  // since it started) — which counts toward the goal's "already saved".
+  const invInfo = new Map<string, { monthly: number; saved: number }>();
   for (const inv of investments) {
     if (inv.status === "exited") continue;
     const f = parseFields(inv.fields);
     const amount = parseAmount(f.amount);
     const freq = f.frequency || "one-time";
-    if (freq === "monthly") invInfo.set(inv.id, { monthly: amount, lump: 0 });
-    else if (freq === "quarterly") invInfo.set(inv.id, { monthly: amount / 3, lump: 0 });
-    else if (freq === "yearly") invInfo.set(inv.id, { monthly: amount / 12, lump: 0 });
-    else invInfo.set(inv.id, { monthly: 0, lump: amount });
+    const start = inv.occurredAt ?? inv.createdAt;
+    const saved = amount * installmentsElapsed(start, freq);
+    if (freq === "monthly") invInfo.set(inv.id, { monthly: amount, saved });
+    else if (freq === "quarterly") invInfo.set(inv.id, { monthly: amount / 3, saved });
+    else if (freq === "yearly") invInfo.set(inv.id, { monthly: amount / 12, saved });
+    else invInfo.set(inv.id, { monthly: 0, saved });
   }
   const linkedContrib = (goalId: string) => {
     let monthly = 0;
-    let lump = 0;
+    let saved = 0;
     for (const c of connections) {
       const other = c.fromId === goalId ? c.toId : c.toId === goalId ? c.fromId : null;
       const info = other ? invInfo.get(other) : undefined;
       if (info) {
         monthly += info.monthly;
-        lump += info.lump;
+        saved += info.saved;
       }
     }
-    return { monthly, lump };
+    return { monthly, saved };
   };
 
   return goals
@@ -67,8 +70,8 @@ export async function goalsWithProjection(): Promise<ProjectedGoal[]> {
       const f = parseFields(g.fields);
       const target = parseAmount(f.amount);
       const explicit = parseAmount(f.monthly);
-      const { monthly: linkedM, lump: linkedLump } = linkedContrib(g.id);
-      const current = parseAmount(f.current) + linkedLump; // linked lump sums already saved
+      const { monthly: linkedM, saved: linkedSaved } = linkedContrib(g.id);
+      const current = parseAmount(f.current) + linkedSaved; // linked SIPs' contributions to date
       const monthly = explicit || linkedM;
       const annualReturnPct = parseAmount(f.expectedReturn) || (monthly > 0 ? 10 : 0);
       const deadline = f.deadline || null;
@@ -174,11 +177,42 @@ async function moneyEntries(): Promise<MoneyEntry[]> {
 }
 
 export type MoneyPeriod = "month" | "quarter" | "year" | "all";
-const PERIOD_DAYS: Record<MoneyPeriod, number> = { month: 30, quarter: 91, year: 365, all: 100000 };
+
+// Calendar-aligned period start (this month, this quarter, this year) — NOT a
+// rolling window, so "this month" means the 1st onward, not the last 30 days.
+function periodStart(period: MoneyPeriod, now = new Date()): number {
+  switch (period) {
+    case "month":
+      return new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    case "quarter":
+      return new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1).getTime();
+    case "year":
+      return new Date(now.getFullYear(), 0, 1).getTime();
+    default:
+      return 0;
+  }
+}
+
+// How many installments a recurring contribution has made from its start date to
+// now (inclusive of the first) — so a monthly SIP started in June shows 2 by
+// July. One-time / unknown → 1.
+export function installmentsElapsed(start: Date, frequency: string, now = new Date()): number {
+  const months = Math.max(0, (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth()));
+  switch (frequency) {
+    case "monthly":
+      return months + 1;
+    case "quarterly":
+      return Math.floor(months / 3) + 1;
+    case "yearly":
+      return Math.max(0, now.getFullYear() - start.getFullYear()) + 1;
+    default:
+      return 1;
+  }
+}
 
 export async function moneyAnalytics(period: MoneyPeriod = "month") {
   const all = await moneyEntries();
-  const since = Date.now() - PERIOD_DAYS[period] * 86_400_000;
+  const since = periodStart(period);
   const inPeriod = (e: MoneyEntry) => e.when.getTime() >= since;
 
   const expenses = all.filter((e) => e.type === "expense");
@@ -210,7 +244,12 @@ export async function moneyAnalytics(period: MoneyPeriod = "month") {
 
   const investments = all.filter((e) => e.type === "investment");
   const investActive = investments.filter((e) => (e as MoneyEntry & { status?: string }).status !== "exited");
-  const investedTotal = investActive.reduce((s, e) => s + e.amount, 0);
+  // A monthly SIP accumulates every month — count each installment since it
+  // started, not just one, so a ₹1,500/mo SIP running 2 months shows ₹3,000.
+  const investedTotal = investActive.reduce(
+    (s, e) => s + e.amount * installmentsElapsed(e.when, e.f.frequency || "one-time"),
+    0,
+  );
 
   const goals = all
     .filter((e) => e.type === "goal" && (e as MoneyEntry & { status?: string }).status !== "abandoned")
