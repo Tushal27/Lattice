@@ -34,6 +34,24 @@ async function writeConfigResource() {
   console.log(`wrote ${path.relative(ROOT, dest)} (url=${url}, secret ${secret === "REPLACE_WITH_YOUR_SECRET" ? "NOT set" : "set"})`);
 }
 
+async function patchVersion() {
+  // versionCode must strictly increase for Android to treat a reinstall as an
+  // upgrade. Drive it from the CI run number; name from the tag when present.
+  const code = parseInt(process.env.LATTICE_VERSION_CODE || process.env.GITHUB_RUN_NUMBER || "1", 10) || 1;
+  let name = process.env.LATTICE_VERSION_NAME;
+  if (!name && process.env.GITHUB_REF_TYPE === "tag" && process.env.GITHUB_REF_NAME) {
+    name = process.env.GITHUB_REF_NAME.replace(/^v/, "");
+  }
+  if (!name) name = `1.0.${code}`;
+
+  const file = path.join(ROOT, "android", "app", "build.gradle");
+  let gradle = await fs.readFile(file, "utf8");
+  gradle = gradle.replace(/versionCode\s+\d+/, `versionCode ${code}`);
+  gradle = gradle.replace(/versionName\s+"[^"]*"/, `versionName "${name}"`);
+  await fs.writeFile(file, gradle);
+  console.log(`set versionCode ${code}, versionName ${name}`);
+}
+
 async function patchManifest() {
   const file = path.join(APP, "AndroidManifest.xml");
   let xml = await fs.readFile(file, "utf8");
@@ -83,6 +101,7 @@ async function main() {
     path.join(APP, "res", "layout", "activity_lattice_settings.xml"),
   );
   await writeConfigResource();
+  await patchVersion();
   await patchManifest();
   console.log("native patch complete.");
 }

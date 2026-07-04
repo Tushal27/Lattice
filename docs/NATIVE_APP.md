@@ -68,8 +68,9 @@ base64 -w0 lattice.keystore   # paste into ANDROID_KEYSTORE_BASE64
 ```
 
 Then: **Actions → Build Android APK → Run workflow**, wait, download
-`lattice-apk`, and sideload it (allow "install unknown apps"). Bump the tag
-(`v1.0.1`, …) for each new build so reinstalls upgrade cleanly.
+`lattice-apk`, and sideload it (allow "install unknown apps"). Each CI run
+auto-bumps `versionCode` from the run number (and `versionName` from the tag),
+so every APK installs as a clean upgrade over the last — no version clashes.
 
 ## Option B — build locally
 
