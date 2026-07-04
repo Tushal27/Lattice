@@ -13,76 +13,95 @@ widgets, biometric lock).
 > iOS note: Apple forbids reading SMS entirely, so SMS capture is Android-only.
 > The shell itself would still work on iOS for everything else.
 
+## Do I have to rebuild for every change?
+
+**No.** The shell loads the live URL, so **all web/UI/backend changes ship with a
+normal Vercel deploy — no rebuild.** You only rebuild the APK when you change
+**native** code (the receiver) or Capacitor config. And even the SMS URL/secret
+are editable **in-app** (the "Lattice SMS" screen), so those never need a rebuild
+either. In practice: build once, then rarely again.
+
 ## What's in the repo
 
 - `capacitor.config.ts` — points the shell at `https://lattice-pink.vercel.app`.
 - `native/www/index.html` — offline fallback splash (Capacitor requires a webDir).
-- `native/android-sms/` — the native pieces you drop into the generated project:
-  - `SmsForwardReceiver.kt` — the background SMS → webhook forwarder.
-  - `AndroidManifest.snippet.xml` — permissions + receiver to merge in.
-  - `lattice.xml` — your webhook URL + secret (string resources).
+- `native/android-sms/` — the native pieces (plain **Java**, so they compile in
+  the stock Capacitor Android project):
+  - `SmsForwardReceiver.java` — background SMS → webhook forwarder.
+  - `SettingsActivity.java` + `activity_lattice_settings.xml` — in-app screen to
+    set the URL/secret and send a test, without rebuilding.
+  - `SmsConfig.java` — reads that config (SharedPreferences → resource fallback).
+  - `AndroidManifest.snippet.xml` — permissions + components (reference).
+  - `lattice.xml` — default URL/secret string resources (reference).
+- `scripts/native-patch.mjs` — drops all of the above into the generated
+  `android/` project and patches the manifest (used by both the manual flow and CI).
+- `.github/workflows/android-apk.yml` — builds + signs the APK in the cloud.
 
-The generated `android/` Gradle project is **not** committed — you generate it
-locally with Android Studio (below). Add `/android` to `.gitignore` if you don't
-want it tracked, or commit it if you prefer.
+The generated `android/` project is **gitignored** — it's produced from the
+official Capacitor template on demand, then patched deterministically.
 
-## One-time setup
+---
 
-Prereqs: **Node 20+**, **Android Studio** (bundled JDK + SDK), a device or
-emulator.
+## Option A — build in the cloud (no Android Studio)
+
+Push a tag (or click **Actions → Build Android APK → Run workflow**) and download
+the signed APK from the run's artifacts (or the GitHub Release for a tag).
+
+**One-time secrets** (repo → Settings → Secrets and variables → Actions):
+
+| Secret | What |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | Your signing keystore, base64-encoded |
+| `ANDROID_KEYSTORE_PASSWORD` | Keystore password |
+| `ANDROID_KEY_ALIAS` | Key alias |
+| `ANDROID_KEY_PASSWORD` | Key password |
+| `LATTICE_INGEST_URL` | *(optional)* bakes a default webhook URL |
+| `LATTICE_INGEST_SECRET` | *(optional)* bakes a default secret |
+
+The `LATTICE_*` ones are optional because you can set them in-app. Generate a
+keystore once and encode it:
+
+```bash
+keytool -genkey -v -keystore lattice.keystore -alias lattice \
+  -keyalg RSA -keysize 2048 -validity 10000
+base64 -w0 lattice.keystore   # paste into ANDROID_KEYSTORE_BASE64
+```
+
+Then: **Actions → Build Android APK → Run workflow**, wait, download
+`lattice-apk`, and sideload it (allow "install unknown apps"). Bump the tag
+(`v1.0.1`, …) for each new build so reinstalls upgrade cleanly.
+
+## Option B — build locally
+
+Prereqs: **Node 20+**, **Android Studio** (bundled JDK + SDK), a device/emulator.
 
 ```bash
 npm install
-npm run cap:add        # generates the android/ project (needs Android SDK)
+npm run cap:add                 # generates android/
+node scripts/native-patch.mjs   # injects the SMS pieces + manifest
+npm run cap:sync                # copies web assets + config
+npm run cap:open                # opens Android Studio → Run, or Build → APK
 ```
 
-### Wire up the SMS receiver
+---
 
-1. Copy the Kotlin file into the app package:
-   `native/android-sms/SmsForwardReceiver.kt`
-   → `android/app/src/main/java/app/lattice/mobile/SmsForwardReceiver.kt`
+## First launch
 
-2. Copy the config resource:
-   `native/android-sms/lattice.xml`
-   → `android/app/src/main/res/values/lattice.xml`
-   Then edit it: set your webhook URL and the **`SMS_INGEST_SECRET`** (or
-   `CRON_SECRET`) you configured in Vercel. Keep this file private.
-
-3. Merge `native/android-sms/AndroidManifest.snippet.xml` into
-   `android/app/src/main/AndroidManifest.xml` (the `RECEIVE_SMS` / `INTERNET`
-   permissions and the `<receiver>` block).
-
-### Build & install
-
-```bash
-npm run cap:sync       # copies web assets + config into android/
-npm run cap:open       # opens Android Studio
-```
-
-In Android Studio: **Run** to install on your phone, or **Build → Build APK** to
-get a sideloadable `.apk`. On first launch, Android will ask to allow **SMS**
-permission — grant it (and disable battery optimization for Lattice so the
-receiver isn't killed).
-
-That's it — pay for something, the bank SMS arrives, and the expense shows up in
-Lattice on its own.
+Android will ask to allow **SMS** — grant it, and disable battery optimization
+for Lattice so the receiver isn't killed. Open the **"Lattice SMS"** icon, set
+your webhook URL + secret (the `SMS_INGEST_SECRET` / `CRON_SECRET` from Vercel),
+tap **Send test**, and confirm it says `Server responded 200`. Done — pay for
+something and the expense logs itself.
 
 ## How auth works
 
-The receiver sends `POST /api/sms` with `Authorization: Bearer <secret>` and a
-JSON body `{"text": "<sms body>"}`. The server matches the secret against
-`SMS_INGEST_SECRET` (falling back to `CRON_SECRET`), dedupes, parses the amount
-+ merchant, categorizes it, and writes the "worth it?" thought. If neither env
-var is set, the endpoint is open (fine for single-user, but set a secret).
+The receiver sends `POST /api/sms` with `Authorization: Bearer <secret>` and
+`{"text": "<sms body>"}`. The server matches the secret against
+`SMS_INGEST_SECRET` (falling back to `CRON_SECRET`), dedupes, parses amount +
+merchant, categorizes, and writes the "worth it?" thought.
 
 ## Privacy
 
-The receiver pre-filters on the phone: only texts containing money words
-(`debited`, `upi`, `₹`, `txn`, …) are sent; everything else never leaves the
-device. The server further ignores anything that isn't a debit transaction.
-
-## Updating
-
-Because the shell loads the live URL, **web changes ship instantly** — deploy to
-Vercel as usual, no rebuild. You only rebuild the APK when you change native code
-(the receiver) or Capacitor config.
+The receiver pre-filters on the phone: only texts with money words (`debited`,
+`upi`, `₹`, `txn`, …) are sent; everything else never leaves the device. The
+server further ignores anything that isn't a debit transaction.

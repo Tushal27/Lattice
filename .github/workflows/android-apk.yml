@@ -1,0 +1,73 @@
+name: Build Android APK
+
+# Builds a signed, sideloadable APK in the cloud so you never open Android
+# Studio. Trigger it manually (Actions tab → Run workflow) or by pushing a tag
+# like v1.0.0 (the APK is attached to the GitHub Release).
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate the Android project
+        run: npx cap add android
+
+      - name: Inject Lattice native pieces
+        env:
+          LATTICE_INGEST_URL: ${{ secrets.LATTICE_INGEST_URL }}
+          LATTICE_INGEST_SECRET: ${{ secrets.LATTICE_INGEST_SECRET }}
+        run: node scripts/native-patch.mjs
+
+      - name: Sync web assets + config
+        run: npx cap sync android
+
+      - name: Build release APK (unsigned)
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Sign APK
+        id: sign
+        uses: r0adkll/sign-android-release@v1
+        with:
+          releaseDirectory: android/app/build/outputs/apk/release
+          signingKeyBase64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          alias: ${{ secrets.ANDROID_KEY_ALIAS }}
+          keyStorePassword: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyPassword: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        env:
+          BUILD_TOOLS_VERSION: "34.0.0"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lattice-apk
+          path: ${{ steps.sign.outputs.signedReleaseFile }}
+
+      - name: Attach APK to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.sign.outputs.signedReleaseFile }}

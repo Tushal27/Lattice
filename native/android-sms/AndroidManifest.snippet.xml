@@ -1,11 +1,13 @@
-<!-- Merge these into android/app/src/main/AndroidManifest.xml. -->
+<!-- Merge these into android/app/src/main/AndroidManifest.xml.
+     (The CI workflow does this automatically via scripts/native-patch.mjs.) -->
 
 <!-- 1. Permissions — put above the <application> tag. -->
 <uses-permission android:name="android.permission.RECEIVE_SMS" />
 <uses-permission android:name="android.permission.INTERNET" />
 
-<!-- 2. Receiver — put INSIDE the <application> element, alongside the existing
-        MainActivity. High priority so it wakes for incoming SMS. -->
+<!-- 2. Inside <application>, alongside the existing MainActivity: -->
+
+<!-- Background SMS receiver — high priority so it wakes for incoming SMS. -->
 <receiver
     android:name=".SmsForwardReceiver"
     android:exported="true"
@@ -14,3 +16,15 @@
         <action android:name="android.provider.Telephony.SMS_RECEIVED" />
     </intent-filter>
 </receiver>
+
+<!-- In-app config screen; shows as a separate "Lattice SMS" launcher entry so
+     you can change the URL/secret without rebuilding. -->
+<activity
+    android:name=".SettingsActivity"
+    android:exported="true"
+    android:label="Lattice SMS">
+    <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+    </intent-filter>
+</activity>
