@@ -26,7 +26,22 @@
             android:text="Where payment SMS are forwarded. Change anytime — no rebuild needed."
             android:textColor="#a1a1aa"
             android:textSize="13sp"
-            android:paddingBottom="20dp" />
+            android:paddingBottom="12dp" />
+
+        <TextView
+            android:id="@+id/permStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textSize="13sp"
+            android:paddingBottom="12dp" />
+
+        <Button
+            android:id="@+id/grant"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Grant SMS permission"
+            android:layout_marginBottom="16dp" />
 
         <TextView
             android:layout_width="wrap_content"

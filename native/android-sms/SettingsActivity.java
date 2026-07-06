@@ -1,10 +1,14 @@
 package app.lattice.mobile;
 
+import android.Manifest;
 import android.app.Activity;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import org.json.JSONObject;
@@ -16,21 +20,33 @@ import java.net.URL;
 /**
  * A tiny native screen to set the SMS webhook URL + secret on the phone — so
  * these can change without ever rebuilding the app. Shows as a separate
- * "Lattice SMS" launcher entry. Includes a "Send test" button that hits the
- * endpoint so you can confirm it works end to end.
+ * "Lattice SMS" launcher entry. Also requests the RECEIVE_SMS runtime permission
+ * (without it, Android never delivers incoming SMS to our receiver) and shows a
+ * live permission status. Includes a "Send test" button.
  */
 public class SettingsActivity extends Activity {
+    private static final int REQ_SMS = 101;
+    private TextView permStatus;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_lattice_settings);
 
+        permStatus = findViewById(R.id.permStatus);
         final EditText urlField = findViewById(R.id.url);
         final EditText secretField = findViewById(R.id.secret);
         urlField.setText(SmsConfig.url(this));
         String sec = SmsConfig.secret(this);
         if (sec != null && sec.contains("REPLACE")) sec = ""; // hide the placeholder default
         secretField.setText(sec);
+
+        findViewById(R.id.grant).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                requestSms();
+            }
+        });
 
         findViewById(R.id.save).setOnClickListener(new View.OnClickListener() {
             @Override
@@ -65,6 +81,51 @@ public class SettingsActivity extends Activity {
                 }).start();
             }
         });
+
+        // Ask up front — incoming SMS won't reach the receiver until this is granted.
+        requestSms();
+    }
+
+    private boolean hasSms() {
+        if (Build.VERSION.SDK_INT < 23) return true;
+        return checkSelfPermission(Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void requestSms() {
+        if (hasSms()) {
+            updatePermStatus();
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= 23) {
+            requestPermissions(new String[]{Manifest.permission.RECEIVE_SMS}, REQ_SMS);
+        }
+    }
+
+    private void updatePermStatus() {
+        if (permStatus == null) return;
+        if (hasSms()) {
+            permStatus.setText("✓ SMS permission granted");
+            permStatus.setTextColor(0xFF34D399);
+        } else {
+            permStatus.setText("⚠ SMS permission needed — tap “Grant SMS permission”. Also enable Auto-start for Lattice.");
+            permStatus.setTextColor(0xFFFBBF24);
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        updatePermStatus();
+        if (requestCode == REQ_SMS) {
+            boolean granted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+            Toast.makeText(this, granted ? "SMS capture enabled" : "SMS permission denied", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        updatePermStatus();
     }
 
     private String sendTest(String u, String s) throws Exception {

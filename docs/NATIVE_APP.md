@@ -94,6 +94,20 @@ your webhook URL + secret (the `SMS_INGEST_SECRET` / `CRON_SECRET` from Vercel),
 tap **Send test**, and confirm it says `Server responded 200`. Done — pay for
 something and the expense logs itself.
 
+## SMS not being recorded?
+
+The `Send test` button works over plain HTTP, so a `200` there does NOT prove SMS
+capture works. Real incoming SMS needs two things Android controls:
+
+1. **RECEIVE_SMS runtime permission** — the app now prompts on the "Lattice SMS"
+   screen and shows a green "✓ SMS permission granted" status. If it's not
+   granted, incoming SMS never reaches the receiver. Grant it there, or via
+   Settings → Apps → Lattice → Permissions → SMS → Allow.
+2. **Auto-start / no battery restriction** — Xiaomi (MIUI), Realme/Oppo/OnePlus
+   (ColorOS), Vivo, Samsung etc. kill background broadcast receivers unless the
+   app is allowed to **Auto-start** and set to **Unrestricted** battery. Enable
+   both for Lattice.
+
 ## How auth works
 
 The receiver sends `POST /api/sms` with `Authorization: Bearer <secret>` and
