@@ -136,12 +136,25 @@ public class SettingsActivity extends Activity {
         conn.setReadTimeout(15000);
         conn.setRequestProperty("Content-Type", "application/json");
         if (!s.isEmpty()) conn.setRequestProperty("Authorization", "Bearer " + s);
-        String payload = new JSONObject().put("text", "Test: debited Rs 1.00 at LATTICE via UPI").toString();
+        // A realistic debit SMS, made unique so it isn't deduped or judged a promo.
+        String sms = "Rs 1.00 debited from A/c XX1234 to LATTICE via UPI Ref " + System.currentTimeMillis() + ".";
+        String payload = new JSONObject().put("text", sms).toString();
         OutputStream os = conn.getOutputStream();
         os.write(payload.getBytes("UTF-8"));
         os.close();
         int code = conn.getResponseCode();
+        // Show the server's decision (created vs skipped + why), not just the code.
+        java.io.InputStream in = code < 400 ? conn.getInputStream() : conn.getErrorStream();
+        StringBuilder body = new StringBuilder();
+        if (in != null) {
+            byte[] buf = new byte[1024];
+            int n;
+            while ((n = in.read(buf)) > 0) body.append(new String(buf, 0, n, "UTF-8"));
+            in.close();
+        }
         conn.disconnect();
-        return "Server responded " + code;
+        String b = body.toString();
+        if (b.length() > 160) b = b.substring(0, 160);
+        return "HTTP " + code + " · " + b;
     }
 }

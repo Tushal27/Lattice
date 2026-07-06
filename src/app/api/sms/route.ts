@@ -74,7 +74,16 @@ async function handle(request: Request) {
 
   const a = await analyzeSpendSms(text);
   if (!a || !a.isTransaction || !a.debit || a.amount <= 0) {
-    return Response.json({ ok: true, skipped: "not a debit transaction" });
+    // Record the arrival so you can confirm forwarding works and see WHY it
+    // wasn't logged (shows up in Settings → Activity).
+    const why = !a ? "couldn't parse" : !a.isTransaction ? "not a transaction" : !a.debit ? "not a debit (credit/refund)" : "no amount found";
+    await logAction({
+      capability: "gmail.capture",
+      summary: `SMS received, not logged (${why}): "${text.slice(0, 70)}"`,
+      reason: "Forwarded from your phone but didn't read as an outgoing payment.",
+      source: "user",
+    }).catch(() => {});
+    return Response.json({ ok: true, skipped: why });
   }
 
   const input = buildEntryInput("expense", {

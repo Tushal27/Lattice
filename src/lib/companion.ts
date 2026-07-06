@@ -620,6 +620,30 @@ async function spendContextString(): Promise<string> {
  * Parse a bank/UPI/card SMS AND form a short, grounded "worth it?" thought in one
  * pass. Returns null for non-transaction texts (OTPs, promos, balance, credits).
  */
+// Pull the paid amount out of a bank/UPI SMS (currency-adjacent number).
+function parseSmsAmount(text: string): number {
+  const m =
+    text.match(/(?:rs\.?|inr|₹)\s*([0-9][0-9,]*(?:\.[0-9]+)?)/i) ||
+    text.match(/([0-9][0-9,]*(?:\.[0-9]+)?)\s*(?:rs\.?|inr|₹)/i);
+  if (!m) return 0;
+  const n = Number(m[1].replace(/,/g, ""));
+  return Number.isFinite(n) ? n : 0;
+}
+
+// Local, AI-free parse so a real debit still gets logged when the AI is down,
+// rate-limited, or roster-only mode has no reachable endpoint. Deliberately
+// conservative: needs a real amount AND a debit word, and bails on credits.
+function localSpendParse(text: string): SpendAnalysis | null {
+  const amount = parseSmsAmount(text);
+  if (amount <= 0) return null;
+  const t = text.toLowerCase();
+  if (/(credited|received|refund|reversed|cashback|deposit|salary)/.test(t)) return null;
+  if (!/(debited|debit|spent|paid|sent|deducted|withdrawn|purchase|txn|payment|charged|debit)/.test(t)) return null;
+  const mm = text.match(/\b(?:at|to|@)\s+([A-Za-z0-9&.\-' ]{2,40})/i);
+  const merchant = mm ? mm[1].trim().replace(/\s+(on|via|using|ref|txn|dated).*/i, "").slice(0, 40) : "Payment";
+  return { isTransaction: true, debit: true, amount, merchant: merchant || "Payment", category: "Other", thought: "" };
+}
+
 export async function analyzeSpendSms(text: string): Promise<SpendAnalysis | null> {
   // Cheap pre-filter so we don't burn an AI call on OTPs/promos.
   if (!/(debit|spent|paid|sent|purchase|txn|transaction|deducted|withdraw|rs\.?|inr|₹|upi)/i.test(text)) return null;
@@ -636,11 +660,12 @@ export async function analyzeSpendSms(text: string): Promise<SpendAnalysis | nul
   ].join("\n");
 
   const ai = await generate(prompt, { system: THINKING_PARTNER_SYSTEM, temperature: 0.4 });
-  if (!ai) return null;
-  const parsed = safeJson(ai);
-  if (!parsed) return null;
+  const parsed = ai ? safeJson(ai) : null;
+  // AI unavailable or unparseable → don't silently drop a real payment.
+  if (!parsed) return localSpendParse(text);
+
   const amount = Number(parsed.amount);
-  return {
+  const result: SpendAnalysis = {
     isTransaction: parsed.isTransaction === true,
     debit: parsed.debit !== false,
     amount: Number.isFinite(amount) ? amount : 0,
@@ -648,6 +673,12 @@ export async function analyzeSpendSms(text: string): Promise<SpendAnalysis | nul
     category: String(parsed.category ?? "Other").slice(0, 40),
     thought: String(parsed.thought ?? "").slice(0, 400),
   };
+  // AI said it's a debit but missed the number → backfill from the local parse.
+  if (result.isTransaction && result.debit && result.amount <= 0) {
+    const local = localSpendParse(text);
+    if (local) result.amount = local.amount;
+  }
+  return result;
 }
 
 export async function connectionInsight(entryId: string) {
