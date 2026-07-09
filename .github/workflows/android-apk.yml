@@ -37,6 +37,7 @@ jobs:
         env:
           LATTICE_INGEST_URL: ${{ secrets.LATTICE_INGEST_URL }}
           LATTICE_INGEST_SECRET: ${{ secrets.LATTICE_INGEST_SECRET }}
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: node scripts/native-patch.mjs
 
       - name: Sync web assets + config

@@ -26,6 +26,7 @@ import java.net.URL;
  */
 public class SettingsActivity extends Activity {
     private static final int REQ_SMS = 101;
+    private static final int REQ_NOTIF = 102;
     private TextView permStatus;
 
     @Override
@@ -84,6 +85,25 @@ public class SettingsActivity extends Activity {
 
         // Ask up front — incoming SMS won't reach the receiver until this is granted.
         requestSms();
+        requestNotifications();
+        registerPush();
+    }
+
+    private void requestNotifications() {
+        if (Build.VERSION.SDK_INT >= 33
+            && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQ_NOTIF);
+        }
+    }
+
+    // Register the FCM token, if this is an FCM-enabled build. Reflective so the
+    // app still compiles when PushRegister/Firebase aren't included.
+    private void registerPush() {
+        try {
+            Class<?> c = Class.forName("app.lattice.mobile.PushRegister");
+            c.getMethod("registerOnStart", android.content.Context.class).invoke(null, this);
+        } catch (Throwable ignored) {
+        }
     }
 
     private boolean hasSms() {

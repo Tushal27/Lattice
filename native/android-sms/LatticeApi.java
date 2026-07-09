@@ -11,6 +11,14 @@ final class LatticeApi {
     private LatticeApi() {}
 
     static int postText(String endpoint, String secret, String text) throws Exception {
+        return post(endpoint, secret, new JSONObject().put("text", text).toString());
+    }
+
+    static int postToken(String endpoint, String secret, String token) throws Exception {
+        return post(endpoint, secret, new JSONObject().put("token", token).toString());
+    }
+
+    private static int post(String endpoint, String secret, String payload) throws Exception {
         HttpURLConnection conn = (HttpURLConnection) new URL(endpoint).openConnection();
         conn.setRequestMethod("POST");
         conn.setDoOutput(true);
@@ -20,7 +28,6 @@ final class LatticeApi {
         if (secret != null && !secret.trim().isEmpty()) {
             conn.setRequestProperty("Authorization", "Bearer " + secret);
         }
-        String payload = new JSONObject().put("text", text).toString();
         OutputStream os = conn.getOutputStream();
         os.write(payload.getBytes("UTF-8"));
         os.close();

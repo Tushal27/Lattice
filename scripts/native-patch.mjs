@@ -137,6 +137,66 @@ async function patchManifest() {
   await fs.writeFile(file, xml);
 }
 
+// Wire native push (FCM) — only when a google-services.json is supplied via the
+// GOOGLE_SERVICES_JSON secret (base64). Otherwise skipped so non-push builds
+// still work. Relies on Capacitor's conditional google-services apply if present,
+// and adds it otherwise.
+async function patchFcm() {
+  const b64 = process.env.GOOGLE_SERVICES_JSON;
+  if (!b64) {
+    console.log("FCM: GOOGLE_SERVICES_JSON not set — native push skipped");
+    return;
+  }
+  await fs.writeFile(path.join(APP, "google-services.json"), Buffer.from(b64, "base64"));
+  await copy(path.join(SRC, "PushRegister.java"), path.join(PKG, "PushRegister.java"));
+  await copy(path.join(SRC, "FcmService.java"), path.join(PKG, "FcmService.java"));
+
+  // Project build.gradle → google-services classpath in the buildscript block.
+  const projGradle = path.join(ROOT, "android", "build.gradle");
+  let proj = await fs.readFile(projGradle, "utf8");
+  if (!/^[^\n/]*classpath\s+['"]com\.google\.gms:google-services/m.test(proj)) {
+    proj = proj.replace(
+      /(buildscript\s*\{[\s\S]*?dependencies\s*\{)/,
+      `$1\n        classpath 'com.google.gms:google-services:4.4.2'`,
+    );
+    await fs.writeFile(projGradle, proj);
+    console.log("FCM: added google-services classpath");
+  }
+
+  // App build.gradle → Firebase messaging dependency + apply the plugin.
+  const appGradle = path.join(ROOT, "android", "app", "build.gradle");
+  let app = await fs.readFile(appGradle, "utf8");
+  if (!app.includes("firebase-messaging")) {
+    app = app.replace(
+      /(dependencies\s*\{)/,
+      `$1\n    implementation platform('com.google.firebase:firebase-bom:33.5.1')\n    implementation 'com.google.firebase:firebase-messaging'`,
+    );
+  }
+  if (!app.includes("com.google.gms.google-services")) {
+    app +=
+      `\ntry {\n    def servicesJSON = file('google-services.json')\n    if (servicesJSON.text) {\n        apply plugin: 'com.google.gms.google-services'\n    }\n} catch (Exception e) {\n    logger.info("google-services.json not found")\n}\n`;
+  }
+  await fs.writeFile(appGradle, app);
+
+  // Manifest → the FCM service.
+  const manifest = path.join(APP, "AndroidManifest.xml");
+  let xml = await fs.readFile(manifest, "utf8");
+  if (!xml.includes(".FcmService")) {
+    const svc = `
+        <service
+            android:name=".FcmService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+`;
+    xml = xml.replace(/(<\/application>)/, `${svc}    $1`);
+    await fs.writeFile(manifest, xml);
+  }
+  console.log("FCM: wired native push");
+}
+
 async function main() {
   await copy(path.join(SRC, "SmsConfig.java"), path.join(PKG, "SmsConfig.java"));
   await copy(path.join(SRC, "SmsForwardReceiver.java"), path.join(PKG, "SmsForwardReceiver.java"));
@@ -153,6 +213,7 @@ async function main() {
   await writeConfigResource();
   await patchVersion();
   await patchManifest();
+  await patchFcm();
   console.log("native patch complete.");
 }
 

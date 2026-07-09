@@ -5,11 +5,12 @@
 
 import webpush from "web-push";
 import { prisma } from "@/lib/db";
+import { fcmEnabled, sendFcmToAll } from "@/lib/fcm";
 
 let configured = false;
 
 export function pushEnabled(): boolean {
-  return Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
+  return Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) || fcmEnabled();
 }
 
 export function publicVapidKey(): string | null {
@@ -58,29 +59,37 @@ export async function subscriptionCount(): Promise<number> {
   return prisma.pushSubscription.count();
 }
 
-/** Send a notification to every stored subscription. Prunes dead ones. */
+/** Send to every Web Push subscription AND every native FCM token. Prunes dead. */
 export async function sendPushToAll(payload: PushPayload): Promise<{ sent: number; pruned: number }> {
-  if (!ensureConfigured()) return { sent: 0, pruned: 0 };
-  const subs = await prisma.pushSubscription.findMany();
   let sent = 0;
   let pruned = 0;
-  const body = JSON.stringify(payload);
-  await Promise.all(
-    subs.map(async (s) => {
-      try {
-        await webpush.sendNotification(
-          { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-          body,
-        );
-        sent++;
-      } catch (err) {
-        const code = (err as { statusCode?: number }).statusCode;
-        if (code === 404 || code === 410) {
-          await prisma.pushSubscription.deleteMany({ where: { endpoint: s.endpoint } });
-          pruned++;
+
+  // Web Push (browser / installed PWA).
+  if (ensureConfigured()) {
+    const subs = await prisma.pushSubscription.findMany();
+    const body = JSON.stringify(payload);
+    await Promise.all(
+      subs.map(async (s) => {
+        try {
+          await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, body);
+          sent++;
+        } catch (err) {
+          const code = (err as { statusCode?: number }).statusCode;
+          if (code === 404 || code === 410) {
+            await prisma.pushSubscription.deleteMany({ where: { endpoint: s.endpoint } });
+            pruned++;
+          }
         }
-      }
-    }),
-  );
+      }),
+    );
+  }
+
+  // Native push (Android app via FCM).
+  if (fcmEnabled()) {
+    const r = await sendFcmToAll(payload).catch(() => ({ sent: 0, pruned: 0 }));
+    sent += r.sent;
+    pruned += r.pruned;
+  }
+
   return { sent, pruned };
 }

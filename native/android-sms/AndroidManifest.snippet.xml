@@ -77,3 +77,12 @@
         <category android:name="android.intent.category.LAUNCHER" />
     </intent-filter>
 </activity>
+
+<!-- Native push (FCM) — only present in FCM-enabled builds. -->
+<service
+    android:name=".FcmService"
+    android:exported="false">
+    <intent-filter>
+        <action android:name="com.google.firebase.MESSAGING_EVENT" />
+    </intent-filter>
+</service>
