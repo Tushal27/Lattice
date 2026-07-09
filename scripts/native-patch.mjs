@@ -58,10 +58,14 @@ async function patchManifest() {
 
   const permissions = `    <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 `;
   if (!xml.includes("android.permission.RECEIVE_SMS")) {
     xml = xml.replace(/(<application\b)/, `${permissions}\n    $1`);
-    console.log("added SMS/INTERNET permissions");
+    console.log("added SMS/INTERNET/foreground-service/boot permissions");
   }
 
   const components = `
@@ -83,10 +87,27 @@ async function patchManifest() {
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".SmsWatchService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="payment_sms_capture" />
+        </service>
+
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 `;
   if (!xml.includes(".SmsForwardReceiver")) {
     xml = xml.replace(/(<\/application>)/, `${components}    $1`);
-    console.log("added receiver + settings activity");
+    console.log("added receiver + settings activity + watch service + boot receiver");
   }
 
   await fs.writeFile(file, xml);
@@ -96,6 +117,8 @@ async function main() {
   await copy(path.join(SRC, "SmsConfig.java"), path.join(PKG, "SmsConfig.java"));
   await copy(path.join(SRC, "SmsForwardReceiver.java"), path.join(PKG, "SmsForwardReceiver.java"));
   await copy(path.join(SRC, "SettingsActivity.java"), path.join(PKG, "SettingsActivity.java"));
+  await copy(path.join(SRC, "SmsWatchService.java"), path.join(PKG, "SmsWatchService.java"));
+  await copy(path.join(SRC, "BootReceiver.java"), path.join(PKG, "BootReceiver.java"));
   await copy(
     path.join(SRC, "activity_lattice_settings.xml"),
     path.join(APP, "res", "layout", "activity_lattice_settings.xml"),

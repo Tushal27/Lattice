@@ -108,6 +108,14 @@ capture works. Real incoming SMS needs two things Android controls:
    app is allowed to **Auto-start** and set to **Unrestricted** battery. Enable
    both for Lattice.
 
+On aggressive ROMs a bare manifest receiver isn't enough, so the app runs a
+**foreground service** (`SmsWatchService`) with a low-priority "Watching for
+payment SMS" notification that keeps a live receiver — the same technique
+MacroDroid uses. It starts when you open the "Lattice SMS" screen and again on
+boot (`BootReceiver`). You still MUST grant Auto-start + Unrestricted battery,
+or the OS will kill even the foreground service. The persistent notification is
+normal and expected — it's what keeps capture alive.
+
 ## How auth works
 
 The receiver sends `POST /api/sms` with `Authorization: Bearer <secret>` and

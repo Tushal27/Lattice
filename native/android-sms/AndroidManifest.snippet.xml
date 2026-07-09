@@ -4,6 +4,10 @@
 <!-- 1. Permissions — put above the <application> tag. -->
 <uses-permission android:name="android.permission.RECEIVE_SMS" />
 <uses-permission android:name="android.permission.INTERNET" />
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
 <!-- 2. Inside <application>, alongside the existing MainActivity: -->
 
@@ -28,3 +32,22 @@
         <category android:name="android.intent.category.LAUNCHER" />
     </intent-filter>
 </activity>
+
+<!-- Foreground service that keeps a live SMS receiver (survives aggressive ROMs). -->
+<service
+    android:name=".SmsWatchService"
+    android:exported="false"
+    android:foregroundServiceType="specialUse">
+    <property
+        android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+        android:value="payment_sms_capture" />
+</service>
+
+<!-- Restart the watcher after reboot. -->
+<receiver
+    android:name=".BootReceiver"
+    android:exported="true">
+    <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+    </intent-filter>
+</receiver>

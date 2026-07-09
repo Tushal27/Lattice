@@ -94,6 +94,7 @@ public class SettingsActivity extends Activity {
     private void requestSms() {
         if (hasSms()) {
             updatePermStatus();
+            SmsWatchService.start(this); // permission present → keep the watcher alive
             return;
         }
         if (Build.VERSION.SDK_INT >= 23) {
@@ -118,6 +119,7 @@ public class SettingsActivity extends Activity {
         updatePermStatus();
         if (requestCode == REQ_SMS) {
             boolean granted = grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+            if (granted) SmsWatchService.start(this);
             Toast.makeText(this, granted ? "SMS capture enabled" : "SMS permission denied", Toast.LENGTH_SHORT).show();
         }
     }
