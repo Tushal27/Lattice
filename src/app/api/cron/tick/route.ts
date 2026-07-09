@@ -1,6 +1,7 @@
 import { CAPABILITIES, getTrust } from "@/lib/capabilities";
 import { contactsDiagnostic } from "@/lib/contacts";
 import { prisma } from "@/lib/db";
+import { fcmEnabled, fcmTokenCount } from "@/lib/fcm";
 import { googleConnected, googleEnabled } from "@/lib/google";
 import { runHeartbeat } from "@/lib/heartbeat";
 import { pushEnabled, subscriptionCount } from "@/lib/push";
@@ -35,8 +36,9 @@ export async function GET(request: Request) {
   if (!authed(request, url)) return new Response("Unauthorized", { status: 401 });
 
   const connected = googleEnabled() ? await googleConnected() : false;
-  const [subs, last, autos, contacts] = await Promise.all([
+  const [subs, fcmTokens, last, autos, contacts] = await Promise.all([
     subscriptionCount().catch(() => 0),
+    fcmTokenCount().catch(() => 0),
     prisma.appState.findUnique({ where: { key: "hb:last" } }).catch(() => null),
     Promise.all(CAPABILITIES.map(async (c) => ({ key: c.key, trust: await getTrust(c.key) }))),
     // Live People-API probe: status tells us 403 (scope/API) vs 200 (works).
@@ -48,6 +50,8 @@ export async function GET(request: Request) {
     health: {
       pushEnabled: pushEnabled(),
       pushSubscriptions: subs,
+      fcmConfigured: fcmEnabled(),
+      fcmDevices: fcmTokens,
       googleConfigured: googleEnabled(),
       googleConnected: connected,
       // contactsStatus: 200=works, 403=scope/API not granted, -1=call threw, 0=not connected
