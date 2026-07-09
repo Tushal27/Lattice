@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import { aiEnabled } from "@/lib/ai";
 import { logAction } from "@/lib/capabilities";
 import { analyzeSpendSms } from "@/lib/companion";
 import { prisma } from "@/lib/db";
@@ -23,17 +24,35 @@ async function authed(request: Request, url: URL): Promise<boolean> {
   return auth === `Bearer ${secret}` || url.searchParams.get("secret") === secret;
 }
 
+// Dedupe only within a short window — enough to catch the same SMS delivered
+// twice (multipart quirks / retries), without permanently blocking a repeated
+// test or a genuinely recurring identical charge.
+const DEDUP_WINDOW_MS = 10 * 60 * 1000;
+
+interface SeenEntry {
+  h: string;
+  t: number;
+}
+
+async function readSeen(): Promise<SeenEntry[]> {
+  const row = await prisma.appState.findUnique({ where: { key: SEEN_KEY } });
+  try {
+    const parsed = JSON.parse(row?.value ?? "[]") as unknown[];
+    // Migrate the old string[] format (t=0 → pruned immediately).
+    return parsed
+      .map((x) => (typeof x === "string" ? { h: x, t: 0 } : (x as SeenEntry)))
+      .filter((e) => e && typeof e.h === "string");
+  } catch {
+    return [];
+  }
+}
+
 async function alreadySeen(text: string): Promise<boolean> {
   const hash = createHash("sha1").update(text.trim()).digest("hex").slice(0, 16);
-  const row = await prisma.appState.findUnique({ where: { key: SEEN_KEY } });
-  let seen: string[] = [];
-  try {
-    seen = JSON.parse(row?.value ?? "[]");
-  } catch {
-    seen = [];
-  }
-  if (seen.includes(hash)) return true;
-  seen.push(hash);
+  const now = Date.now();
+  const seen = (await readSeen()).filter((e) => now - e.t < DEDUP_WINDOW_MS);
+  if (seen.some((e) => e.h === hash)) return true;
+  seen.push({ h: hash, t: now });
   await prisma.appState.upsert({
     where: { key: SEEN_KEY },
     create: { key: SEEN_KEY, value: JSON.stringify(seen.slice(-500)) },
@@ -130,9 +149,42 @@ async function handle(request: Request) {
   return Response.json({ ok: true, created: entry.id, amount: a.amount, category: a.category, thought: a.thought });
 }
 
+// A no-guessing audit: hit /api/sms?diag=1&secret=YOUR_SECRET in a browser to
+// see whether SMS are actually reaching the server, how many were logged vs
+// skipped, and why.
+async function diagnostic(): Promise<Response> {
+  const secret = process.env.SMS_INGEST_SECRET || process.env.CRON_SECRET;
+  const seen = await readSeen();
+  const recent = await prisma.actionLog.findMany({
+    where: { capability: "gmail.capture" },
+    orderBy: { createdAt: "desc" },
+    take: 20,
+    select: { summary: true, createdAt: true },
+  });
+  const sms = recent.filter((r) => /SMS/i.test(r.summary));
+  return Response.json({
+    ok: true,
+    secretRequired: Boolean(secret),
+    aiEnabled: aiEnabled(),
+    dedupWindowMinutes: DEDUP_WINDOW_MS / 60000,
+    recentlySeenCount: seen.filter((e) => Date.now() - e.t < DEDUP_WINDOW_MS).length,
+    smsArrivalsLogged: sms.length,
+    recentSms: sms.map((r) => ({ at: r.createdAt, summary: r.summary })),
+    hint:
+      sms.length === 0
+        ? "No SMS have reached the server. If real payments aren't here, the phone isn't forwarding — check SMS permission + Auto-start/battery for Lattice."
+        : "SMS are reaching the server. If an expense is missing, check its summary above for the skip reason.",
+  });
+}
+
 // Both verbs work, so the phone app can use whichever is simplest (a GET with
-// ?text=… is the easiest to set up).
+// ?text=… is the easiest to set up). ?diag=1 returns the audit above.
 export async function GET(request: Request) {
+  const url = new URL(request.url);
+  if (url.searchParams.get("diag")) {
+    if (!(await authed(request, url))) return new Response("Unauthorized", { status: 401 });
+    return diagnostic();
+  }
   return handle(request);
 }
 export async function POST(request: Request) {
