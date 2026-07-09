@@ -24,6 +24,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+          cache: gradle
 
       - uses: android-actions/setup-android@v3
 
@@ -46,7 +47,13 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
+          # Retry — the Gradle distribution download is occasionally flaky.
+          n=0
+          until ./gradlew assembleRelease --no-daemon; do
+            n=$((n + 1))
+            if [ "$n" -ge 3 ]; then echo "gradle failed after $n attempts"; exit 1; fi
+            echo "gradle attempt $n failed — retrying in 15s…"; sleep 15
+          done
 
       - name: Sign APK
         id: sign
