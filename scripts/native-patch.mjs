@@ -147,7 +147,9 @@ async function patchFcm() {
     console.log("FCM: GOOGLE_SERVICES_JSON not set — native push skipped");
     return;
   }
-  await fs.writeFile(path.join(APP, "google-services.json"), Buffer.from(b64, "base64"));
+  // Must live at the app-module root (android/app/), NOT src/main — that's
+  // where the Google Services plugin looks.
+  await fs.writeFile(path.join(ROOT, "android", "app", "google-services.json"), Buffer.from(b64, "base64"));
   await copy(path.join(SRC, "PushRegister.java"), path.join(PKG, "PushRegister.java"));
   await copy(path.join(SRC, "FcmService.java"), path.join(PKG, "FcmService.java"));
 
