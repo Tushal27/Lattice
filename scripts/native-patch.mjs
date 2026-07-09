@@ -163,7 +163,9 @@ async function patchFcm() {
     console.log("FCM: added google-services classpath");
   }
 
-  // App build.gradle → Firebase messaging dependency + apply the plugin.
+  // App build.gradle → Firebase messaging dependency + apply the plugin
+  // UNCONDITIONALLY (no try/catch) so a bad/mismatched google-services.json
+  // fails the build loudly instead of silently leaving Firebase un-initialized.
   const appGradle = path.join(ROOT, "android", "app", "build.gradle");
   let app = await fs.readFile(appGradle, "utf8");
   if (!app.includes("firebase-messaging")) {
@@ -172,9 +174,8 @@ async function patchFcm() {
       `$1\n    implementation platform('com.google.firebase:firebase-bom:33.5.1')\n    implementation 'com.google.firebase:firebase-messaging'`,
     );
   }
-  if (!app.includes("com.google.gms.google-services")) {
-    app +=
-      `\ntry {\n    def servicesJSON = file('google-services.json')\n    if (servicesJSON.text) {\n        apply plugin: 'com.google.gms.google-services'\n    }\n} catch (Exception e) {\n    logger.info("google-services.json not found")\n}\n`;
+  if (!app.includes("// lattice-fcm-apply")) {
+    app += `\n// lattice-fcm-apply\napply plugin: 'com.google.gms.google-services'\n`;
   }
   await fs.writeFile(appGradle, app);
 
