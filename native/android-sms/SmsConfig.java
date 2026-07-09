@@ -28,6 +28,14 @@ public final class SmsConfig {
         return ctx.getString(R.string.lattice_ingest_secret);
     }
 
+    /** The /api/capture endpoint (same origin as the SMS webhook). */
+    public static String captureUrl(Context ctx) {
+        String u = url(ctx);
+        int idx = u.indexOf("/api/");
+        String base = idx > 0 ? u.substring(0, idx) : u.replaceAll("/+$", "");
+        return base + "/api/capture";
+    }
+
     public static void save(Context ctx, String url, String secret) {
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()

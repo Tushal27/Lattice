@@ -51,3 +51,29 @@
         <action android:name="android.intent.action.BOOT_COMPLETED" />
     </intent-filter>
 </receiver>
+
+<!-- Share-to-Lattice: appears in the system share sheet for text/links. -->
+<activity
+    android:name=".ShareActivity"
+    android:exported="true"
+    android:label="Save to Lattice"
+    android:excludeFromRecents="true"
+    android:theme="@android:style/Theme.Translucent.NoTitleBar">
+    <intent-filter>
+        <action android:name="android.intent.action.SEND" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <data android:mimeType="text/plain" />
+    </intent-filter>
+</activity>
+
+<!-- Voice quick-capture: a "Lattice Voice" launcher entry. -->
+<activity
+    android:name=".VoiceActivity"
+    android:exported="true"
+    android:label="Lattice Voice"
+    android:theme="@android:style/Theme.Translucent.NoTitleBar">
+    <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+    </intent-filter>
+</activity>

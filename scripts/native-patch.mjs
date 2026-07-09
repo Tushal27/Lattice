@@ -104,10 +104,34 @@ async function patchManifest() {
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <activity
+            android:name=".ShareActivity"
+            android:exported="true"
+            android:label="Save to Lattice"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".VoiceActivity"
+            android:exported="true"
+            android:label="Lattice Voice"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
 `;
   if (!xml.includes(".SmsForwardReceiver")) {
     xml = xml.replace(/(<\/application>)/, `${components}    $1`);
-    console.log("added receiver + settings activity + watch service + boot receiver");
+    console.log("added receiver + settings + watch service + boot + share + voice");
   }
 
   await fs.writeFile(file, xml);
@@ -119,6 +143,9 @@ async function main() {
   await copy(path.join(SRC, "SettingsActivity.java"), path.join(PKG, "SettingsActivity.java"));
   await copy(path.join(SRC, "SmsWatchService.java"), path.join(PKG, "SmsWatchService.java"));
   await copy(path.join(SRC, "BootReceiver.java"), path.join(PKG, "BootReceiver.java"));
+  await copy(path.join(SRC, "LatticeApi.java"), path.join(PKG, "LatticeApi.java"));
+  await copy(path.join(SRC, "ShareActivity.java"), path.join(PKG, "ShareActivity.java"));
+  await copy(path.join(SRC, "VoiceActivity.java"), path.join(PKG, "VoiceActivity.java"));
   await copy(
     path.join(SRC, "activity_lattice_settings.xml"),
     path.join(APP, "res", "layout", "activity_lattice_settings.xml"),
